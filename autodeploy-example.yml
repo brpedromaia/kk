@@ -24,3 +24,11 @@ cluster:
           repo: https://github.com/brpedromaia/simple-python-api.git
           path: chart
           branch: main
+        - app: hello
+          repo: https://github.com/brpedromaia/kk
+          path: resources/examples/apps/hello
+          branch: main
+        - app: agnhost
+          repo: https://github.com/brpedromaia/kk
+          path: resources/examples/apps/agnhost
+          branch: main
