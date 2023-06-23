@@ -1,0 +1,95 @@
+#!/bin/bash
+
+autodeploy(){
+  local ARGOCD_DOMAIN_NAME=`yq ".cluster.argocd.domain" $KK_AUTO_CREATION_FILE`
+  until $(curl --output /dev/null --silent --head --fail https://argocd.$ARGOCD_DOMAIN_NAME); do
+    printf 'Waiting for argocd become UP'
+    sleep 2
+  done
+  sleep 5
+  local AUTOD_NS_LENGTH=`yq ".cluster.namespaces|length" $KK_AUTO_CREATION_FILE`
+  for ((i = 0 ; i < $AUTOD_NS_LENGTH ; i++ )); do
+    local AUTOD_NS_NAME=`yq ".cluster.namespaces.$i.name" $KK_AUTO_CREATION_FILE`
+    kubectl create ns $AUTOD_NS_NAME
+    kubectl create clusterrolebinding $AUTOD_NS_NAME-default-admin-binding --clusterrole=cluster-admin --serviceaccount=$AUTOD_NS_NAME:default
+    local AUTOD_APP_LENGTH=`yq ".cluster.namespaces.$i.apps|length" $KK_AUTO_CREATION_FILE`
+    for ((ii = 0 ; ii < $AUTOD_APP_LENGTH ; ii++ )); do
+      local AUTOD_APP_NAME=`yq ".cluster.namespaces.$i.apps.$ii.app" $KK_AUTO_CREATION_FILE`
+      local AUTOD_APP_REPO=`yq ".cluster.namespaces.$i.apps.$ii.repo" $KK_AUTO_CREATION_FILE`
+      local AUTOD_APP_PATH=`yq ".cluster.namespaces.$i.apps.$ii.path" $KK_AUTO_CREATION_FILE`
+      local AUTOD_APP_BRANCH=`yq ".cluster.namespaces.$i.apps.$ii.branch" $KK_AUTO_CREATION_FILE`
+      argocd app create $AUTOD_APP_NAME --repo $AUTOD_APP_REPO --revision $AUTOD_APP_BRANCH --path $AUTOD_APP_PATH --dest-server https://kubernetes.default.svc --dest-namespace $AUTOD_NS_NAME --sync-policy auto
+    done
+  done
+}
+
+argocd_bootstrap(){
+
+  # Required variables
+  local ARGOCD_NS=`yq ".cluster.argocd.namespace" $KK_AUTO_CREATION_FILE`
+  local ARGOCD_ADMIN_PASSWORD=`yq ".cluster.argocd.password" $KK_AUTO_CREATION_FILE`
+  local ARGOCD_DOMAIN_NAME=`yq ".cluster.argocd.domain" $KK_AUTO_CREATION_FILE`
+  local ARGOCD_TLS_FOLDER=`yq ".cluster.argocd.tls_folder" $KK_AUTO_CREATION_FILE`
+  kubectl create namespace $ARGOCD_NS
+  
+  # TLS secrets creation
+  if [ "$ARGOCD_DOMAIN_NAME" == "rec.la" ];then
+    curl -s https://www.rec.la/rec.la-bundle.crt -o $ARGOCD_TLS_FOLDER/tls.crt 
+    curl -s https://www.rec.la/rec.la-key.pem -o $ARGOCD_TLS_FOLDER/tls.key
+  fi
+  ls -lha /$ARGOCD_TLS_FOLDER/tls*
+  for ARGOCD_SECRET_NAME_TMP in "argocd-server-tls" "argocd-repo-server-tls" "argocd-dex-server-tls"; do
+    kubectl create -n $ARGOCD_NS secret tls $ARGOCD_SECRET_NAME_TMP --cert=$ARGOCD_TLS_FOLDER/tls.crt  --key=$ARGOCD_TLS_FOLDER/tls.key
+  done 
+
+  # Argocd install manifest
+  kubectl apply -n $ARGOCD_NS -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.7.6/manifests/install.yaml
+  # Argocd Ingress Creation
+  cat /usr/local/kind-container/autocreation/argocd-ingress.yml |  sed "s/\$ARGOCD_DOMAIN_NAME/$ARGOCD_DOMAIN_NAME/g" | kubectl -n $ARGOCD_NS apply -f -
+  kubectl wait --namespace $ARGOCD_NS --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=180s
+  sleep 20 # waiting for argocd service to start
+  # Argocd setup default password from YAML
+  local ARGOCD_CURRENT_PASSWORD=""
+  while [ "${#ARGOCD_CURRENT_PASSWORD}" == 0 ]; do
+    ARGOCD_CURRENT_PASSWORD=`argocd admin initial-password -n $ARGOCD_NS| head -n1`
+  done
+  argocd login argocd.$ARGOCD_DOMAIN_NAME --username admin --password $ARGOCD_CURRENT_PASSWORD
+  argocd account update-password --account admin --current-password $ARGOCD_CURRENT_PASSWORD --new-password $ARGOCD_ADMIN_PASSWORD
+
+  argocd cluster add -y $(kubectl config get-contexts -o name)
+}
+
+autocreate(){
+  local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`
+  local AUTOD_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_AUTO_CREATION_FILE`
+
+  kkind multinode "$AUTOD_CLUSTER_LENGTH" "$AUTOD_CLUSTER_NAME"
+  argocd_bootstrap
+  autodeploy
+}
+
+ns(){
+  local NEW_NS=$1
+  if [ "$NEW_NS" == "" ] ;then
+      echo "$(kk 'get' 'ns'  | sed "s/$KK_DEFAULT_NAMESPACE /$KK_DEFAULT_NAMESPACE*/g")"
+  elif [ "$NEW_NS" != "$KK_DEFAULT_NAMESPACE" ] ;then 
+    kubectl get ns $NEW_NS &>/dev/null
+    if [ "$?" == "0" ];then
+      kubectl config set-context --current --namespace=$NEW_NS  &>/dev/null
+      KK_DEFAULT_NAMESPACE="$NEW_NS" 
+      echo "Namespace has changed to $NEW_NS"
+    else
+      echo "Namespace $NEW_NS not found"
+    fi
+  fi
+}
+
+case "$1" in
+  autotest) autotest;;
+  autodeploy) autodeploy;;
+  autocreate) autocreate;;
+  autotests) autotests;;
+  ns|namespace) ns $2 ;;
+  *) kubectl $@ ;; 
+esac
+

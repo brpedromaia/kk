@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+_kk_completions_validation(){
+  case "$1" in
+    verblist) echo "ns ct create delete deletecollection get list patch update watch";;
+    ns|namespace) echo "$(kk $@ | awk 'NR>1 {print $1}')" ;;
+    *) if [ "${#@}" == "1" ];then
+        echo "$(kubectl api-resources --verbs="${COMP_WORDS[1]}" --no-headers --namespaced="true" | rev | awk '{print $5" "$4" "tolower($1)}'|rev) node nodes" 
+        else
+        echo $(kk "$1 $2" | awk 'NR>1 {print $1}')
+        fi   
+      ;;
+  esac
+}
+export -f _kk_completions_validation
+
+_kk_completions_reply(){
+  K_COMP_SIZE="${#COMP_WORDS[@]}"
+  K_COMP_WORDS=$(( $K_COMP_SIZE -1 ))
+  COMPREPLY=($(compgen -W "$(echo $@)" "${COMP_WORDS[$K_COMP_WORDS]}" ))
+}
+export -f _kk_completions_reply
+
+_kk_completions(){
+  case "$(( ${#COMP_WORDS[@]} -2 ))" in
+    0) _kk_completions_reply "$(_kk_completions_validation verblist)";;
+    1) _kk_completions_reply "$(_kk_completions_validation ${COMP_WORDS[1]})" ;;
+    2) _kk_completions_reply "$(_kk_completions_validation "get" "${COMP_WORDS[2]}")" ;;
+    *) _kk_completions_reply "" ;; 
+  esac
+}
+export -f _kk_completions
+
+_kkind_completions(){
+  case "$(( ${#COMP_WORDS[@]} -2 ))" in
+    0) _kk_completions_reply "singlenode multinode delete";;
+    *) _kk_completions_reply "" ;; 
+  esac
+}
+export -f _kkind_completions
+
+
+kk_bash() {
+
+  export KUBECTL_CONTEXT=$(kubectl config current-context 2>&1| sed "s/.*not set/none/g")
+
+  CONTEXT_COLOR='\033[01;31m'
+  PS_CONTEXT_COLOR='\[\033[01;31m\]'
+  NAMESPACE_COLOR='\033[01;36m'
+  PS_NAMESPACE_COLOR='\[\033[01;36m\]'
+  PS_LPURPLE='\[\033[01;35m\]'
+  PS_RESTORE='\[\033[0m\]'
+
+  complete -F _kk_completions kk
+  complete -F _kkind_completions kkind
+  
+  export PS1="($PS_CONTEXT_COLOR\$KUBECTL_CONTEXT$PS_RESTORE/$PS_NAMESPACE_COLOR\$KK_DEFAULT_NAMESPACE$PS_RESTORE) \W ${PS_LPURPLE}\$${PS_RESTORE} "
+}
+
+export -f kk_bash
+export PS1=""
+[ ! -z "$KK_AUTO_CREATION_FILE" ] && kk autocreate
+bash -i <<< 'kk_bash; exec </dev/tty'

@@ -1,0 +1,19 @@
+FROM alpine:3.17.1
+
+
+RUN /bin/sh -c apk update ;\
+    apk add --no-cache bash git curl jq docker helm yq ;\
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.27.3/bin/linux/amd64/kubectl ;\
+    chmod +x ./kubectl && mv ./kubectl /usr/bin/kubectl ;\
+    curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 ;\
+    chmod +x ./kind && mv ./kind /usr/local/bin/kind ;\
+    curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 ;\
+    chmod +x ./argocd && mv ./argocd /usr/local/bin/argocd ;\
+     rm -rf /var/cache/apk/* /tmp/* /sbin/halt /sbin/poweroff /sbin/reboot
+COPY --chmod=0777 bin/* /usr/bin/
+COPY resources/ /usr/local/kind-container
+
+SHELL ["/bin/bash"]
+CMD ["/usr/bin/kkbash"]
+
+

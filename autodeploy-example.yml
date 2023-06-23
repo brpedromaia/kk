@@ -1,0 +1,26 @@
+cluster:
+  name: 'cluster-example'
+  workers: 3
+  autocreation: yes
+  argocd:
+    enabled: yes
+    namespace: argocd
+    password: "Password123"
+    domain: 'rec.la'
+    tls_folder: /tmp
+  namespaces:
+    - name: myns
+      domain: 'rec.la'
+      apps:
+        - app: stakeater
+          repo: https://github.com/stakater/Reloader.git
+          path: deployments/kubernetes/manifests
+          branch: 'v1.0.27'
+        - app: openresty
+          repo: https://github.com/brpedromaia/openresty.git
+          path: chart
+          branch: main
+        - app: books
+          repo: https://github.com/brpedromaia/simple-python-api.git
+          path: chart
+          branch: main
