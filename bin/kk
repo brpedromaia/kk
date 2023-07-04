@@ -60,6 +60,9 @@ argocd_bootstrap(){
 }
 
 autocreate(){
+  local KK_CLUSTER_AUTOCREATION=`yq ".cluster.autocreation" $KK_AUTO_CREATION_FILE`
+  [ "$KK_CLUSTER_AUTOCREATION" != "yes" ] && echo "autocreation skipped" && return 0
+  
   local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`
   local AUTOD_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_AUTO_CREATION_FILE`
 
