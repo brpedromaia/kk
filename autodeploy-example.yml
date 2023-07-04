@@ -1,34 +1,34 @@
 cluster:
-  name: 'cluster-example'
-  workers: 3
-  autocreation: yes
-  argocd:
-    enabled: yes
-    namespace: argocd
-    password: "Password123"
-    domain: 'rec.la'
+  name: 'cluster-example' # kind cluster name
+  workers: 3 # 0-> singlenode >=1 -> multinode
+  autocreation: yes # to enable the cluster creation from this yaml file
+  argocd: 
+    enabled: yes # to enable argocd release ( autodeploy requires argocd enable = yes)
+    namespace: argocd # what namespace it's creating argocd
+    password: "Password123" # set default password for admin
+    domain: 'rec.la' # rec.la is resolving 127.0.0.1 and we are able to get their letsencrypt certs.
     tls_folder: /tmp
   namespaces:
-    - name: myns
-      domain: 'rec.la'
-      apps:
-        - app: stakeater
-          repo: https://github.com/stakater/Reloader.git
-          path: deployments/kubernetes/manifests
-          branch: 'v1.0.27'
-        - app: openresty
-          repo: https://github.com/brpedromaia/openresty.git
-          path: chart
-          branch: main
-        - app: books
-          repo: https://github.com/brpedromaia/simple-python-api.git
-          path: chart
-          branch: main
-        - app: hello
-          repo: https://github.com/brpedromaia/kk
-          path: resources/examples/apps/hello
-          branch: main
-        - app: agnhost
-          repo: https://github.com/brpedromaia/kk
-          path: resources/examples/apps/agnhost
-          branch: main
+    - name: myns # namespace name to release through autodeploy (requires argocd enabled)
+      domain: 'rec.la' # rec.la is resolving 127.0.0.1 and we are able to get their letsencrypt certs.
+      apps: # apps list with all apps to release into 'myns' namespace
+        - app: stakeater # app name
+          repo: https://github.com/stakater/Reloader.git # app repository
+          path: deployments/kubernetes/manifests # app git path to helm or k8s manifests
+          branch: 'v1.0.27' # branch name or tag name
+        - app: openresty # app name
+          repo: https://github.com/brpedromaia/openresty.git # app repository
+          path: chart # app git path to helm or k8s manifests
+          branch: main # branch name or tag name
+        - app: books # app name
+          repo: https://github.com/brpedromaia/simple-python-api.git # app repository
+          path: chart # app git path to helm or k8s manifests
+          branch: main # branch name or tag name
+        - app: hello # app name
+          repo: https://github.com/brpedromaia/kk # app repository
+          path: resources/examples/apps/hello # app git path to helm or k8s manifests
+          branch: main # branch name or tag name
+        - app: agnhost # app name
+          repo: https://github.com/brpedromaia/kk # app repository
+          path: resources/examples/apps/agnhost # app git path to helm or k8s manifests
+          branch: main # branch name or tag name

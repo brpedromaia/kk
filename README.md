@@ -11,7 +11,7 @@ docker run --privileged --rm -it --name kk  \
   -e "KK_AUTO_CREATION_FILE=/tmp/autodeploy-example.yml" \
   -v $PWD/autodeploy-example.yml:/tmp/autodeploy-example.yml \
   -v $HOME/.kube/config:/root/.kube/config \
-  brpedromaia/kk:v1
+  brpedromaia/kk:v2 bash
 ```
 
 # TO DO: Proper Readme.md 
@@ -30,3 +30,7 @@ curl -s https://playground.rec.la/books/ |jq
 curl -s https://playground.rec.la/hello
 curl -s https://playground.rec.la/agnhost
 ```
+
+apk add bash-completion
+source <(kubectl completion bash)
+kubectl config get-contexts -o name

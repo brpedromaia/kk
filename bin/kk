@@ -45,7 +45,7 @@ argocd_bootstrap(){
   # Argocd install manifest
   kubectl apply -n $ARGOCD_NS -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.7.6/manifests/install.yaml
   # Argocd Ingress Creation
-  cat /usr/local/kind-container/autocreation/argocd-ingress.yml |  sed "s/\$ARGOCD_DOMAIN_NAME/$ARGOCD_DOMAIN_NAME/g" | kubectl -n $ARGOCD_NS apply -f -
+  cat /usr/local/kk/argocd-ingress.yml |  sed "s/\$ARGOCD_DOMAIN_NAME/$ARGOCD_DOMAIN_NAME/g" | kubectl -n $ARGOCD_NS apply -f -
   kubectl wait --namespace $ARGOCD_NS --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=180s
   sleep 20 # waiting for argocd service to start
   # Argocd setup default password from YAML
@@ -65,6 +65,13 @@ autocreate(){
   
   local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`
   local AUTOD_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_AUTO_CREATION_FILE`
+  kind get clusters | grep $AUTOD_CLUSTER_NAME &>/dev/null
+  if [ "$?" == 0 ];then
+    echo "Cluster $AUTOD_CLUSTER_NAME is already created"
+    KK_CONTEXT=""
+    ct "kind-$AUTOD_CLUSTER_NAME"
+    return 0
+  fi
   if [ "$AUTOD_CLUSTER_LENGTH" == "0" ];then
     kkind singlenode "$AUTOD_CLUSTER_NAME"
   else
@@ -81,12 +88,12 @@ autocreate(){
 ns(){
   local NEW_NS=$1
   if [ "$NEW_NS" == "" ] ;then
-      echo "$(kk 'get' 'ns'  | sed "s/$KK_DEFAULT_NAMESPACE /$KK_DEFAULT_NAMESPACE*/g")"
-  elif [ "$NEW_NS" != "$KK_DEFAULT_NAMESPACE" ] ;then 
+      echo "$(kk 'get' 'ns' | awk 'NR>1 {print $1}'  | sed "s/$KK_NAMESPACE /$KK_NAMESPACE*/g")"
+  elif [ "$NEW_NS" != "$KK_NAMESPACE" ] ;then 
     kubectl get ns $NEW_NS &>/dev/null
     if [ "$?" == "0" ];then
       kubectl config set-context --current --namespace=$NEW_NS  &>/dev/null
-      KK_DEFAULT_NAMESPACE="$NEW_NS" 
+      export KK_NAMESPACE="$NEW_NS" 
       echo "Namespace has changed to $NEW_NS"
     else
       echo "Namespace $NEW_NS not found"
@@ -94,12 +101,29 @@ ns(){
   fi
 }
 
+ct(){
+  local NEW_CTX=$1
+  if [ "$NEW_CTX" == "" ] ;then
+    echo $(kubectl config get-contexts -o name)
+  elif [ "$NEW_CTX" != "$KK_CONTEXT" ] ;then 
+    kubectl config get-contexts $NEW_CTX &>/dev/null
+    if [ "$?" == "0" ];then
+      kubectl config use-context $NEW_CTX 
+      export KK_CONTEXT="$NEW_CTX" 
+    else
+      echo "Context $NEW_CTX not found"
+    fi
+  fi
+}
+
+source $HOME/.kkrc
 case "$1" in
   autotest) autotest;;
   autodeploy) autodeploy;;
   autocreate) autocreate;;
   autotests) autotests;;
   ns|namespace) ns $2 ;;
+  ct|context) ct $2;;
+  pretty_bash) pretty_bash;;
   *) kubectl $@ ;; 
 esac
-
