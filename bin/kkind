@@ -33,7 +33,10 @@ ingress_bootstrap() {
     kind create cluster -n $2 --config /usr/local/kind-container/autocreation/kind-config.yml && ingress_bootstrap
   fi
  }
- 
+
+get_clusters(){
+ echo $(kind get clusters | tr "\n" " ")
+}
 
 delete() {
   local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`

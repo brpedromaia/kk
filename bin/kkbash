@@ -24,8 +24,8 @@ export -f _kk_completions_reply
 _kk_completions(){
   case "$(( ${#COMP_WORDS[@]} -2 ))" in
     0) _kk_completions_reply "$(_kk_completions_validation verblist)";;
-    1) _kk_completions_reply "$(_kk_completions_validation ${COMP_WORDS[1]})" ;;
-    2) _kk_completions_reply "$(_kk_completions_validation "get" "${COMP_WORDS[2]}")" ;;
+    1) _kk_completions_reply "$(_kk_completions_validation ${COMP_WORDS[1]})";;
+    2) _kk_completions_reply "$(_kk_completions_validation "get" "${COMP_WORDS[2]}")";;
     *) _kk_completions_reply "" ;; 
   esac
 }
@@ -34,6 +34,7 @@ export -f _kk_completions
 _kkind_completions(){
   case "$(( ${#COMP_WORDS[@]} -2 ))" in
     0) _kk_completions_reply "singlenode multinode delete";;
+    1) [ "${COMP_WORDS[1]}" == "delete" ] && _kk_completions_reply "$(kkind "get_clusters")";; 
     *) _kk_completions_reply "" ;; 
   esac
 }
@@ -59,5 +60,5 @@ kk_bash() {
 
 export -f kk_bash
 export PS1=""
-[ ! -z "$KK_AUTO_CREATION_FILE" ] && kk autocreate
+[ ! -z "$KK_AUTO_CREATION_FILE" ] && [ ! -f "$KK_AUTO_CREATION_FILE" ] && kk autocreate
 bash -i <<< 'kk_bash; exec </dev/tty'
