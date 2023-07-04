@@ -65,10 +65,17 @@ autocreate(){
   
   local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`
   local AUTOD_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_AUTO_CREATION_FILE`
-
-  kkind multinode "$AUTOD_CLUSTER_LENGTH" "$AUTOD_CLUSTER_NAME"
-  argocd_bootstrap
-  autodeploy
+  if [ "$AUTOD_CLUSTER_LENGTH" == "0" ];then
+    kkind singlenode "$AUTOD_CLUSTER_NAME"
+  else
+    kkind multinode "$AUTOD_CLUSTER_LENGTH" "$AUTOD_CLUSTER_NAME"
+  fi
+  
+  local KK_ARGOCD_ENABLED=`yq ".cluster.argocd.enabled" $KK_AUTO_CREATION_FILE`
+  if [ "$KK_ARGOCD_ENABLED" == "yes" ];then
+    argocd_bootstrap
+    autodeploy
+  fi
 }
 
 ns(){

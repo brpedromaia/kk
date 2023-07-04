@@ -60,5 +60,5 @@ kk_bash() {
 
 export -f kk_bash
 export PS1=""
-[ ! -z "$KK_AUTO_CREATION_FILE" ] && [ ! -f "$KK_AUTO_CREATION_FILE" ] && kk autocreate
+[ ! -z "$KK_AUTO_CREATION_FILE" ] && [ -f "$KK_AUTO_CREATION_FILE" ] && kk autocreate
 bash -i <<< 'kk_bash; exec </dev/tty'
