@@ -30,7 +30,3 @@ curl -s https://playground.rec.la/books/ |jq
 curl -s https://playground.rec.la/hello
 curl -s https://playground.rec.la/agnhost
 ```
-
-apk add bash-completion
-source <(kubectl completion bash)
-kubectl config get-contexts -o name
