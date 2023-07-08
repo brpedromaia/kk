@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kibana
+  namespace: monitoring
+  labels:
+    application: kibana
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: kibana
+  template:
+    metadata:
+      labels:
+        application: kibana
+      annotations:
+        co.elastic.monitor/0.type: icmp
+        co.elastic.monitor/0.hosts: ${data.host}
+        co.elastic.monitor/0.schedule: "@every 5s"
+        co.elastic.monitor/0.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/0.tags.0: kibana
+        co.elastic.monitor/0.tags.1: development
+        co.elastic.monitor/0.tags.2: pod
+        co.elastic.monitor/1.type: tcp
+        co.elastic.monitor/1.hosts: ${data.host}:5601
+        co.elastic.monitor/1.schedule: "@every 5s"
+        co.elastic.monitor/1.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/1.tags.0: kibana
+        co.elastic.monitor/1.tags.1: development
+        co.elastic.monitor/1.tags.2: pod
+        co.elastic.monitor/2.type: http
+        co.elastic.monitor/2.hosts: ${data.host}:5601/status
+        co.elastic.monitor/2.schedule: "@every 5s"
+        co.elastic.monitor/2.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/2.tags.0: kibana
+        co.elastic.monitor/2.tags.1: development
+        co.elastic.monitor/2.tags.2: pod
+    spec:
+      terminationGracePeriodSeconds: 300
+      # securityContext:
+      #   privileged: true
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.17.11
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: tcp
+        resources:
+          requests:
+            cpu: 300m
+            memory: 500Mi
+          limits:
+            cpu: 600m
+            memory: 1Gi
+        env:
+          - name: ELASTICSEARCH_URL
+            value: http://elasticsearch:9200
+          - name: ELASTICSEARCH_HOSTS
+            value: http://elasticsearch:9200
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/kibana/data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 500Gi

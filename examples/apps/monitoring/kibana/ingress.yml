@@ -1,0 +1,29 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana-ingress
+  namespace: monitoring
+  labels:
+    application: kibana
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+spec:
+  tls:
+  - hosts:
+      - kibana.rec.la
+    secretName: kibana-tls
+  rules:
+  - host: kibana.rec.la
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              name: http

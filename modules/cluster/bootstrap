@@ -1,0 +1,107 @@
+#!/bin/bash
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+KK_FRAMEWORK_VERSION=v1-alpha
+
+
+kk_args_yaml(){
+  local RESOURCE=${1,,}
+  local RESOURCE_NAME=${2,,}
+  local ARGS_FILD_PATH=".$RESOURCE"
+  shift 
+  shift
+  ARGS_YML=""
+  ARGS_YML=$(echo -e ""| yq -o=json ".version=\"$KK_FRAMEWORK_VERSION\"")
+  # ARGS_YML=$(echo -e "$ARGS_YML"| yq -o=json ".kind=\"$RESOURCE\"")
+  if [ "$RESOURCE" == cluster ];then
+    ARGS_YML=$(echo -e "$ARGS_YML"| yq "$ARGS_FILD_PATH.name=\"$RESOURCE_NAME\"")
+    ARGS_YML=$(echo -e "$ARGS_YML"| yq -o=json "$ARGS_FILD_PATH.name=\"$RESOURCE_NAME\"")
+  else
+    ARGS_FILD_PATH=".cluster.$RESOURCE"
+    [ "$RESOURCE" == namespace ] && RESOURCE="namespaces" && ARGS_FILD_PATH=".cluster.namespaces"
+    ARGS_YML=$(echo -e "$ARGS_YML"| yq e ".cluster.\"namespaces\"+=[{\"name\":\"$RESOURCE_NAME\",\"enabled\":\"yes\"}]")
+    echo $ARGS_YML |yq -P
+  fi
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apply) ARGS_YML=$(echo -e "$ARGS_YML"| yq "$ARGS_FILD_PATH.autocreation=\"auto\"") ;;
+      -c | --cluster) ARGS_YML=$(echo -e "$ARGS_YML"| yq ".cluster.name=\"$2\"");shift ;;
+      -f | --file) ARGS_YML=$(echo -e "$ARGS_YML"| yq "$ARGS_FILD_PATH.plan.from_file=\"$2\"");shift ;;
+      --*) 
+        if [[ $2 =~ ^[[:digit:]]+$ ]];then
+          ARGS_YML=$(echo "$ARGS_YML"| yq "$ARGS_FILD_PATH.${1:2}=$2" -)
+        else
+          if [[ $2 == *","* ]];then
+            local KK_BOOTSTRAP_SPEC_ITEM="${1:2}"
+            local KK_BOOTSTRAP_ITEMS=(${2//,/ })
+            for KK_BOOTSTRAP_ITEM in ${KK_BOOTSTRAP_ITEMS[@]};do
+              # ARGS_YML=$(echo -e "$ARGS_YML"| yq "$ARGS_FILD_PATH.$KK_BOOTSTRAP_SPEC_ITEM.$KK_BOOTSTRAP_ITEM.enabled = \"yes\"")
+              ARGS_YML=$(echo -e "$ARGS_YML"| yq e ".cluster.\"$KK_BOOTSTRAP_SPEC_ITEM\"+=[{\"name\":\"$KK_BOOTSTRAP_ITEM\",\"enabled\":\"yes\"}]")
+            done
+          else
+            ARGS_YML=$(echo "$ARGS_YML"| yq "$ARGS_FILD_PATH.${1:2}=\"$2\"" -)
+          fi
+        fi
+        shift
+        ;;
+      *) "* Error: Invalid Parameter: $1\n";;
+    esac
+    shift
+  done
+
+  KK_BOOTSTRAP_DEFAULT_FILE="$HOME/.kk/$(echo -e "$ARGS_YML"|yq .cluster.name).yml"
+  [ "$(echo -e "$ARGS_YML"|yq $ARGS_FILD_PATH.plan.from_file)" == "null" ] && ARGS_YML=$(echo -e "$ARGS_YML"| yq "$ARGS_FILD_PATH.plan.from_file=\"$KK_BOOTSTRAP_DEFAULT_FILE\"")
+  
+  echo $ARGS_YML
+}
+
+kk_bootstrap(){
+  KK_BOOTSTRAP_YML=""
+
+  for ((i=1;i<=$#;i++)); 
+  do
+    NEXT_ITEM="$((i+1))"
+    case "${!i}" in
+    -f | --file) 
+      KK_BOOTSTRAP_YML=$( cat ${!NEXT_ITEM} | yq -o=json);
+      break
+    ;;
+    esac
+  done
+
+  [ "$KK_BOOTSTRAP_YML" == "" ] && KK_BOOTSTRAP_YML=$(kk_args_yaml $@)
+  local KK_BOOTSTRAP_CLUSTER_FILE="$(echo -e "$KK_BOOTSTRAP_YML"|yq .cluster.plan.from_file)"
+  local KK_BOOTSTRAP_CLUSTER_FOLDER="${KK_BOOTSTRAP_CLUSTER_FILE%/*}"
+
+  mkdir -p $KK_BOOTSTRAP_CLUSTER_FOLDER &>/dev/null
+  [ ! -f "$$KK_BOOTSTRAP_CLUSTER_FILE" ] && echo -e "$KK_BOOTSTRAP_YML"| yq -P > $KK_BOOTSTRAP_CLUSTER_FILE
+  yq -i ".cluster.plan.creation = \"$(date +%F_%T)\"" $KK_BOOTSTRAP_CLUSTER_FILE
+
+  echo -e "\nCluster Creation Plan:\n\nfile: $KK_BOOTSTRAP_CLUSTER_FILE"
+  cat $KK_BOOTSTRAP_CLUSTER_FILE|yq
+
+  $KK_BOOTSTRAP_CURRENT_FOLDER/cluster validation $KK_BOOTSTRAP_CLUSTER_FILE
+  [ "$?" == "1" ] && return 1
+
+  yq -i ".cluster.plan.validated = \"$(date +%F_%T)\"" $KK_BOOTSTRAP_CLUSTER_FILE
+
+  local KK_BOOTSTRAP_APPLY="$(echo -e "$KK_BOOTSTRAP_YML"|yq .cluster.autocreation)"
+  if [ "$KK_BOOTSTRAP_APPLY" == "null" ];then
+    read -p "Apply this plan (y/n)? " answer
+    answer=${answer,,}
+    case ${answer:0:1} in
+        y|yes ) KK_BOOTSTRAP_APPLY="auto";;
+        *) echo Aborted;;
+    esac
+  fi
+  if [ "$KK_BOOTSTRAP_APPLY" == "auto" ];then
+    echo "Applying the approved plan..."
+    yq -i ".cluster.plan.approved = \"$(date +%F_%T)\"" $KK_BOOTSTRAP_CLUSTER_FILE
+
+    $KK_BOOTSTRAP_CURRENT_FOLDER/cluster bootstrap $KK_BOOTSTRAP_CLUSTER_FILE
+  fi
+
+}
+
+kk_bootstrap $@

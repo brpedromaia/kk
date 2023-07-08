@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apm-server-config
+  namespace: monitoring
+  labels:
+    application: apm-server
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+data:
+  apm-server.yml: |-
+    apm-server.frontend.enabled: true
+    apm-server.host: "0.0.0.0:8200"
+    apm-server.auth.secret_token: 123456
+
+    # setup.kibana:
+    #   host: 'http://${KIBANA_CUSTOM_HOST:kibana}:${KIBANA_CUSTOM_PORT:5601}'
+
+    output.elasticsearch:
+      hosts: ['${ELASTIC_CUSTOM_HOST:elasticsearch}:${ELASTIC_CUSTOM_PORT:9200}']
+      username: ${ELASTIC_CUSTOM_USERNAME:elastic}
+      # password: ${ELASTIC_PASSWORD}

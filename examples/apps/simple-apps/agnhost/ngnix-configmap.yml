@@ -1,0 +1,20 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name:  agnhost
+  labels:
+    application: agnhost
+    version: "2.39"
+    release: "r7"
+    stage: development
+    component: example-apps
+    part-of: kk-example
+  annotations:
+    reloader.stakater.com/match: "true"
+data:
+  service.conf: |-
+    location /agnhost {
+        proxy_pass http://agnhost:8080;
+        include /usr/local/openresty/nginx/conf/proxy.conf;
+    }

@@ -10,14 +10,14 @@ RUN /bin/sh -c apk update ;\
     curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 ;\
     chmod +x ./argocd && mv ./argocd /usr/local/bin/argocd ;\
      rm -rf /var/cache/apk/* /tmp/* /sbin/halt /sbin/poweroff /sbin/reboot
-COPY --chmod=0777 bin/* /usr/bin/
-COPY resources/autocreation /usr/local/kk/
-COPY resources/bash/.bashrc /root/.bashrc
-COPY resources/bash/kk-completion /usr/share/bash-completion/completions/kk
-COPY resources/bash/kkind-completion /usr/share/bash-completion/completions/kkind
+
+COPY . /opt/kk/
+
+COPY config/bash/.bashrc /etc/bash/bashrc
+COPY config/bash/kk-completion /usr/share/bash-completion/completions/kk
 
 SHELL ["/bin/bash"]
-ENTRYPOINT [ "container-entrypoint" ]
-CMD ["/bin/bash"]
+# ENTRYPOINT [ "bash" ]
+CMD ["bash"]
 
 

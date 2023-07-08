@@ -1,48 +1,47 @@
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name:  agnhost
-  labels:
-    app:  agnhost
-  annotations:
-    reloader.stakater.com/match: "true"
-data:
-  service.conf: |-
-    location /agnhost {
-        proxy_pass http://agnhost:8080;
-        include /usr/local/openresty/nginx/conf/proxy.conf;
-    }
 
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: agnhost
-spec:
-  selector:
-    app: agnhost
-  ports:
-  - port: 8080
-  
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: agnhost
   labels:
-    deployment: agnhost
+    application: agnhost
+    version: "2.39"
+    release: "r7"
+    stage: development
+    component: example-apps
+    part-of: kk-example
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: agnhost
-      deployment: agnhost
+      application: agnhost
   template:
     metadata:
       labels:
-        app: agnhost
-        deployment: agnhost
+        application: agnhost
+      annotations:
+        co.elastic.monitor/0.type: icmp
+        co.elastic.monitor/0.hosts: ${data.host}
+        co.elastic.monitor/0.schedule: "@every 5s"
+        co.elastic.monitor/0.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/0.tags.0: agnhost
+        co.elastic.monitor/0.tags.1: development
+        co.elastic.monitor/0.tags.2: pod
+        co.elastic.monitor/1.type: tcp
+        co.elastic.monitor/1.hosts: ${data.host}:8080
+        co.elastic.monitor/1.schedule: "@every 5s"
+        co.elastic.monitor/1.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/1.tags.0: agnhost
+        co.elastic.monitor/1.tags.1: development
+        co.elastic.monitor/1.tags.2: pod
+        co.elastic.monitor/2.type: http
+        co.elastic.monitor/2.hosts: ${data.host}:8080/
+        co.elastic.monitor/2.schedule: "@every 5s"
+        co.elastic.monitor/2.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/2.tags.0: agnhost
+        co.elastic.monitor/2.tags.1: development
+        co.elastic.monitor/2.tags.2: pod
     spec:
       volumes:
         - name: config
@@ -98,4 +97,3 @@ spec:
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
-

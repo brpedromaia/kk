@@ -1,0 +1,32 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: hello
+  labels:
+    application: hello
+    version: "alpine"
+    release: "r7"
+    stage: development
+    component: example-apps
+    part-of: kk-example
+  annotations:
+    co.elastic.monitor/0.type: tcp
+    co.elastic.monitor/0.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:5678
+    co.elastic.monitor/0.schedule: "@every 5s"
+    co.elastic.monitor/0.name: hello-svc
+    co.elastic.monitor/0.tags.0: hello
+    co.elastic.monitor/0.tags.1: development
+    co.elastic.monitor/0.tags.2: service
+    co.elastic.monitor/1.type: http
+    co.elastic.monitor/1.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:5678/
+    co.elastic.monitor/1.schedule: "@every 5s"
+    co.elastic.monitor/1.name: hello-svc
+    co.elastic.monitor/1.tags.0: hello
+    co.elastic.monitor/1.tags.1: development
+    co.elastic.monitor/1.tags.2: service
+spec:
+  selector:
+    application: hello
+  ports:
+  - port: 5678

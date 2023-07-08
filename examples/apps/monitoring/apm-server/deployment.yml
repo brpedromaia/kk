@@ -1,0 +1,62 @@
+---
+# Deploy singleton instance in the whole cluster for some unique data sources, like kube-state-metrics
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apm-server
+  namespace: monitoring
+  labels:
+    application: apm-server
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+spec:
+  selector:
+    matchLabels:
+      application: apm-server
+  template:
+    metadata:
+      labels:
+        application: apm-server
+      annotations:
+        co.elastic.monitor/0.type: icmp
+        co.elastic.monitor/0.hosts: ${data.host}
+        co.elastic.monitor/0.schedule: "@every 5s"
+        co.elastic.monitor/0.name: apm-server
+        co.elastic.monitor/0.tags.0: apm-server
+        co.elastic.monitor/0.tags.1: development
+        co.elastic.monitor/0.tags.2: pod
+    spec:
+      containers:
+      - name: apm
+        image: docker.elastic.co/apm/apm-server:7.8.0
+        args: [
+          "-c", "/etc/apm-server.yml",
+          "-e",
+        ]
+        ports:
+        - containerPort: 8200
+          name: http
+        securityContext:
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/apm-server.yml
+          readOnly: true
+          subPath: apm-server.yml
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 0600
+          name: apm-server-config
+
+      

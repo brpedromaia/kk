@@ -1,0 +1,20 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name:  hello
+  labels:
+    application: hello
+    version: "alpine"
+    release: "r7"
+    stage: development
+    component: example-apps
+    part-of: kk-example
+  annotations:
+    reloader.stakater.com/match: "true"
+data:
+  service.conf: |-
+    location /hello {
+        proxy_pass http://hello:5678;
+        include /usr/local/openresty/nginx/conf/proxy.conf;
+    }

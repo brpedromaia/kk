@@ -1,6 +1,8 @@
 
 export USER=$(whoami)
 
+export PATH=$PATH:/opt/kk/bin/
+
 kubectl completion bash > /usr/share/bash-completion/completions/kubectl
 kind completion bash > /usr/share/bash-completion/completions/kind
 

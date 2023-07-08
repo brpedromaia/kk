@@ -1,0 +1,137 @@
+#!/bin/bash
+
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+KK_BOOTSTRAP_RESOURCES="$KK_BOOTSTRAP_CURRENT_FOLDER/../../config/namespace/"
+
+autodeploy(){
+  KK_BOOTSTRAP_YML $1
+  local AUTOD_NS_LENGTH=`yq ".cluster.namespaces|length" $KK_BOOTSTRAP_YML`
+  for ((i = 0 ; i < $AUTOD_NS_LENGTH ; i++ )); do
+    local AUTOD_NS_NAME=`yq ".cluster.namespaces.$i.name" $KK_BOOTSTRAP_YML`
+    kubectl create ns $AUTOD_NS_NAME
+    kubectl create clusterrolebinding $AUTOD_NS_NAME-default-admin-binding --clusterrole=cluster-admin --serviceaccount=$AUTOD_NS_NAME:default
+    local AUTOD_APP_LENGTH=`yq ".cluster.namespaces.$i.apps|length" $KK_BOOTSTRAP_YML`
+    for ((ii = 0 ; ii < $AUTOD_APP_LENGTH ; ii++ )); do
+      local AUTOD_APP_NAME=`yq ".cluster.namespaces.$i.apps.$ii.app" $KK_BOOTSTRAP_YML`
+      local AUTOD_APP_REPO=`yq ".cluster.namespaces.$i.apps.$ii.repo" $KK_BOOTSTRAP_YML`
+      local AUTOD_APP_PATH=`yq ".cluster.namespaces.$i.apps.$ii.path" $KK_BOOTSTRAP_YML`
+      local AUTOD_APP_BRANCH=`yq ".cluster.namespaces.$i.apps.$ii.branch" $KK_BOOTSTRAP_YML`
+      local AUTOD_APP_STRATEGY=`yq ".cluster.namespaces.$i.apps.$ii.strategy" $KK_BOOTSTRAP_YML`
+      argocd app create $AUTOD_APP_NAME --repo $AUTOD_APP_REPO --revision $AUTOD_APP_BRANCH --path $AUTOD_APP_PATH --dest-server https://kubernetes.default.svc --dest-namespace $AUTOD_NS_NAME --sync-policy auto
+    done
+  done
+}
+
+
+validation(){
+
+  local KK_FILE=$1
+  local KK_DIC_PATH="cluster.bootstrap.argocd"
+  local KK_REQ_FIELDS=(namespace password domain tls_folder)
+  local KK_REQ_ERROR=""
+  
+  [ ! -f "$KK_FILE" ] && KK_REQ_ERROR="File not found: $KK_FILE"
+
+  [[ "yes true" == *"$(yq .$KK_DIC_PATH.enabled $KK_FILE)"* ]] || KK_REQ_ERROR="argocd is not enabled"
+
+  for KK_REQ_FIELD in ${KK_REQ_FIELDS[@]};do
+    if [ "$(yq .$KK_DIC_PATH.$KK_REQ_FIELD $KK_FILE)" == "null" ];then
+      local KK_DEFAULT_VALUE="$(yq .$KK_DIC_PATH.$KK_REQ_FIELD  $KK_BOOTSTRAP_RESOURCES/cluster.yml)"
+      yq -i ".$KK_DIC_PATH.$KK_REQ_FIELD = \"$KK_DEFAULT_VALUE\"" $KK_FILE
+    fi
+  done
+
+  [ "$KK_REQ_ERROR" != "" ] && echo -e "$KK_REQ_ERROR" && return 1
+
+  return 0
+
+}
+
+
+xbootstrap(){
+
+  yq -i ".cluster.bootstrap.argocd.apply.started = \"$(date +%F_%T)\"" $1
+
+  validation $1
+  [ "$?" == "1" ] && yq -i ".cluster.bootstrap.argocd.apply.status = \"failed before apply\"" $1 && return 1
+  yq -i ".cluster.bootstrap.argocd.apply.validated = \"$(date +%F_%T)\"" $1
+  
+  echo "Setting Argocd from kk bootstrap..."
+  apply $1
+  [ "$?" == "1" ] && yq -i ".cluster.bootstrap.argocd.apply.status = \"failed after apply\"" $1 && return 1
+  yq -i ".cluster.bootstrap.argocd.apply.finished = \"$(date +%F_%T)\"" $1
+
+}
+
+
+bootstrap(){
+  KK_BOOTSTRAP_YML=""
+
+  for ((i=1;i<=$#;i++)); 
+  do
+    NEXT_ITEM="$((i+1))"
+    case "${!i}" in
+    -f | --file) 
+      KK_BOOTSTRAP_YML="${!NEXT_ITEM}";
+      break
+    ;;
+    esac
+  done
+
+  echo $KK_BOOTSTRAP_YML 
+  local AUTOD_NS_LENGTH=`yq ".cluster.namespaces|length" $KK_BOOTSTRAP_YML`
+  for ((i = 0 ; i < $AUTOD_NS_LENGTH ; i++ )); do
+    local AUTOD_NS_NAME=`yq ".cluster.namespaces.$i.name" $KK_BOOTSTRAP_YML`
+    local AUTOD_NS_ENABLED=`yq ".cluster.namespaces.$i.enabled" $KK_BOOTSTRAP_YML`
+    local AUTOD_NS_APPS=`yq ".cluster.namespaces.$i.apps|length" $KK_BOOTSTRAP_YML`
+    if [ "$AUTOD_NS_ENABLED" == "yes" ];then
+      # kubectl create ns $AUTOD_NS_NAME &>/dev/null
+      # kubectl create clusterrolebinding $AUTOD_NS_NAME-default-admin-binding --clusterrole=cluster-admin --serviceaccount=$AUTOD_NS_NAME:default &>/dev/null
+      if [ "$AUTOD_NS_APPS" == 0 ];then
+        bootstrap_apps $AUTOD_NS_NAME $KK_BOOTSTRAP_YML
+        break
+      else
+        apply_apps $AUTOD_NS_NAME $KK_BOOTSTRAP_YML
+      fi
+    fi
+  done
+}
+
+bootstrap_apps(){
+  local KK_BOOTSTRAP_NS_APP=$1
+  local KK_BOOTSTRAP_YML=$2
+  local KK_BOOTSTRAP_RESOURCE_FILE="$KK_BOOTSTRAP_RESOURCES/$KK_BOOTSTRAP_NS_APP.yml"
+  local KK_BOOTSTRAP_RESOURCE_ITEM="$(yq '.cluster.namespaces' -o=json $KK_BOOTSTRAP_RESOURCE_FILE )"
+  ARGS_YML=$(cat $KK_BOOTSTRAP_YML | yq ea ".cluster.\"namespaces\"+=$KK_BOOTSTRAP_RESOURCE_ITEM" |yq e -o=json "del(.cluster.namespaces[] | select(.name == \"$KK_BOOTSTRAP_NS_APP\" and .apps == null ))")
+  ARGS_YML=$(echo $ARGS_YML | yq -o=json)
+  apply_apps $KK_BOOTSTRAP_NS_APP "$ARGS_YML"
+}
+
+
+apply_apps(){
+  KK_BOOTSTRAP_NS_APP=$1
+  KK_BOOTSTRAP_YML=$2
+  # KK_BOOTSTRAP_YML_VALUES="$(cat $KK_BOOTSTRAP_YML)"
+  echo $KK_BOOTSTRAP_NS_APP
+  KK_BOOTSTRAP_YML_APPS=`echo $KK_BOOTSTRAP_YML | yq e -o=yaml ".cluster.namespaces[]|select(.name == \"$KK_BOOTSTRAP_NS_APP\") .apps"`
+  echo $KK_BOOTSTRAP_YML_APPS|yq . -P
+
+  local AUTOD_APP_LENGTH=`echo $KK_BOOTSTRAP_YML_APPS | yq '.|length'`
+
+  for ((ii = 0 ; ii < $AUTOD_APP_LENGTH ; ii++ )); do
+    local AUTOD_APP_NAME=`echo $KK_BOOTSTRAP_YML_APPS| yq ".[$i].app"`
+    local AUTOD_APP_REPO=`echo $KK_BOOTSTRAP_YML_APPS| yq ".$i.repo"`
+    local AUTOD_APP_PATH=`echo $KK_BOOTSTRAP_YML_APPS| yq ".$i.path"`
+    local AUTOD_APP_BRANCH=`echo $KK_BOOTSTRAP_YML_APPS| yq ".$i.branch"`
+    local AUTOD_APP_STRATEGY=`echo $KK_BOOTSTRAP_YML_APPS| yq ".$i.strategy"`
+
+    if [ "$AUTOD_APP_STRATEGY" == "argocd" ];then
+      argocd app create $AUTOD_APP_NAME --repo $AUTOD_APP_REPO --revision $AUTOD_APP_BRANCH --path $AUTOD_APP_PATH --dest-server https://kubernetes.default.svc --dest-namespace $AUTOD_NS_NAME --sync-policy auto
+    else
+      echo "strategy: $AUTOD_APP_STRATEGY not implemented"
+    fi
+  done
+}
+
+bootstrap $@
