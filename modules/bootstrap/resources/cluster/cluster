@@ -90,6 +90,8 @@ kk_bootstrap(){
       kk bootstrap namespace -f $KK_BOOTSTRAP_CLUSTER_FILE
     fi
   fi
+  local KK_BOOTSTRAP_CLUSTER_NAME="$(echo -e "$KK_BOOTSTRAP_YML"|yq .cluster.name)"
+  echo -e "Cool! kk framework has delivered your kind cluster 🥰 \n$KK_BOOTSTRAP_CLUSTER_NAME cluster is ready to use!🚀\n\nEnjoy! Cheers 👋"
 
 }
 

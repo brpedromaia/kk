@@ -48,7 +48,6 @@ bootstrap_apps(){
   local KK_BOOTSTRAP_YML=$2
   local KK_BOOTSTRAP_RESOURCE_FILE="$KK_BOOTSTRAP_CURRENT_FOLDER/$KK_BOOTSTRAP_NS_APP.yml"
   local KK_BOOTSTRAP_RESOURCE_ITEM="$(yq '.cluster.namespaces' -o=json $KK_BOOTSTRAP_RESOURCE_FILE )"
-  echo "$KK_BOOTSTRAP_RESOURCE_ITEM"
 
   yq -i ea "del(.cluster.namespaces[] | select(.name == \"$KK_BOOTSTRAP_NS_APP\" ))" $KK_BOOTSTRAP_YML
   yq -i ea -o=yaml ".cluster.\"namespaces\"+=$KK_BOOTSTRAP_RESOURCE_ITEM" $KK_BOOTSTRAP_YML

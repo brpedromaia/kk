@@ -43,7 +43,6 @@ apply(){
     done
   fi
 
-  echo -e "Cool! kk framework has delivered your kind cluster 🥰 \n$KK_CLUSTER_NAME cluster is ready to use!🚀\n\nEnjoy! Cheers 👋"
 
   return 0
 
