@@ -3,8 +3,12 @@ export USER=$(whoami)
 
 export PATH=$PATH:/opt/kk/bin/
 
-kubectl completion bash > /usr/share/bash-completion/completions/kubectl
-kind completion bash > /usr/share/bash-completion/completions/kind
+if [ ! -f "/usr/share/bash-completion/completions/kk" ];then
+  kubectl completion bash > /usr/share/bash-completion/completions/kubectl
+  kind completion bash > /usr/share/bash-completion/completions/kind
+  kk completion bash > /usr/share/bash-completion/completions/kk
+  . /usr/share/bash-completion/bash_completion
+fi
 
 pretty_bash(){
   KK_INFO="$(kubectl config view --minify -o=json 2>/dev/null| jq '.contexts[0].context')"

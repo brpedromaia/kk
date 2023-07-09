@@ -1,0 +1,57 @@
+#!/bin/bash
+
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+
+bootstrap(){
+  KK_BOOTSTRAP_YML=""
+
+  for ((i=1;i<=$#;i++)); 
+  do
+    NEXT_ITEM="$((i+1))"
+    case "${!i}" in
+    -f | --file) 
+      KK_BOOTSTRAP_YML="${!NEXT_ITEM}";
+      break
+    ;;
+    esac
+  done
+
+  local AUTOD_NS_LENGTH=`yq ".cluster.namespaces|length" $KK_BOOTSTRAP_YML`
+  for ((i = 0 ; i < $AUTOD_NS_LENGTH ; i++ )); do
+    local AUTOD_NS_NAME=`yq ".cluster.namespaces.$i.name" $KK_BOOTSTRAP_YML`
+    local AUTOD_NS_ENABLED=`yq ".cluster.namespaces.$i.enabled" $KK_BOOTSTRAP_YML`
+    local AUTOD_NS_APPS=`yq ".cluster.namespaces.$i.apps|length" $KK_BOOTSTRAP_YML`
+    if [ "$AUTOD_NS_ENABLED" == "yes" ];then
+      kubectl create ns $AUTOD_NS_NAME &>/dev/null
+      kubectl create clusterrolebinding $AUTOD_NS_NAME-default-admin-binding --clusterrole=cluster-admin --serviceaccount=$AUTOD_NS_NAME:default &>/dev/null
+      if [ "$AUTOD_NS_APPS" == 0 ];then
+        case "$AUTOD_NS_NAME" in
+          myapps | monitoring) 
+            bootstrap_apps $AUTOD_NS_NAME $KK_BOOTSTRAP_YML
+            $KK_BOOTSTRAP_CURRENT_FOLDER/../cd $AUTOD_NS_NAME $KK_BOOTSTRAP_YML
+          ;;
+          *) echo "no apps found to release" ;;
+        esac
+        
+      else
+        $KK_BOOTSTRAP_CURRENT_FOLDER/../cd $AUTOD_NS_NAME $KK_BOOTSTRAP_YML
+      fi
+    fi
+  done
+
+  
+}
+
+bootstrap_apps(){
+  local KK_BOOTSTRAP_NS_APP=$1
+  local KK_BOOTSTRAP_YML=$2
+  local KK_BOOTSTRAP_RESOURCE_FILE="$KK_BOOTSTRAP_CURRENT_FOLDER/$KK_BOOTSTRAP_NS_APP.yml"
+  local KK_BOOTSTRAP_RESOURCE_ITEM="$(yq '.cluster.namespaces' -o=json $KK_BOOTSTRAP_RESOURCE_FILE )"
+  echo "$KK_BOOTSTRAP_RESOURCE_ITEM"
+
+  yq -i ea "del(.cluster.namespaces[] | select(.name == \"$KK_BOOTSTRAP_NS_APP\" ))" $KK_BOOTSTRAP_YML
+  yq -i ea -o=yaml ".cluster.\"namespaces\"+=$KK_BOOTSTRAP_RESOURCE_ITEM" $KK_BOOTSTRAP_YML
+}
+
+bootstrap $@

@@ -1,10 +1,11 @@
 _kk_completions_validation(){
-  export KK_RESOURCE_LIST="$(kubectl api-resources --verbs="${COMP_WORDS[1]}" --no-headers --namespaced="true" | rev | awk '{print $5" "$4" "tolower($1)}'|rev| tr '\n' ' '| sed -r  's/[[:space:]]+/ /g') node nodes" 
+  export KK_RESOURCE_LIST="$(kubectl api-resources --verbs="${COMP_WORDS[1]}" --no-headers --namespaced="true" 2>/dev/null| rev | awk '{print $5" "$4" "tolower($1)}'|rev| tr '\n' ' '| sed -r  's/[[:space:]]+/ /g') node nodes" 
 
   case "$1" in
-    verblist) echo "ns namespace ct context create delete deletecollection get list patch update watch";;
+    verblist) echo "bootstrap namespace context create delete get list patch update watch";;
     ns|namespace) echo "$(kk $@)" ;;
     ct|context) echo "$(kk $@)" ;;
+    bootstrap) echo "cluster namespace" ;;
     *)  if [ "${#@}" == "1" ];then
           echo $KK_RESOURCE_LIST
         elif [ "${KK_RESOURCE_LIST#*"$2"}" != "$KK_RESOURCE_LIST" ]; then

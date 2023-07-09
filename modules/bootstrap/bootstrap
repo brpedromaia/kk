@@ -45,15 +45,16 @@ kk_bootstrap_help(){
 
 bootstrap(){
   KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
-  # [[ "$@" == *"-h "* ]] | [[ "$@" == *"-help "* ]] && help;exit
-  case "$1" in
-    cluster) $KK_CURRENT_FOLDER/cluster/bootstrap $@;;
-    namespace)
-      $KK_CURRENT_FOLDER/namespace/bootstrap $@;;
-    app) $KK_CURRENT_FOLDER/app/bootstrap $@;;
-    "" | -h | --help) help ;;
-    # *) $@ ;; 
-  esac
+  if [ "$2" != "" ];then
+    case "${1}" in
+      cluster) $KK_CURRENT_FOLDER/resources/cluster/cluster $@;;
+      namespace)
+        $KK_CURRENT_FOLDER/resources/namespace/namespace $@;;
+      "" | -h | --help) kk_bootstrap_help ;;
+    esac
+  else
+    kk_bootstrap_help
+  fi
 }
 
-$@
+bootstrap ${@:2}

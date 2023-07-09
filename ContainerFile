@@ -13,11 +13,11 @@ RUN /bin/sh -c apk update ;\
 
 COPY . /opt/kk/
 
-COPY config/bash/.bashrc /etc/bash/bashrc
-COPY config/bash/kk-completion /usr/share/bash-completion/completions/kk
+COPY etc/bash/.bashrc /etc/bash/bashrc
+# COPY etc/bash/.bashrc /root/.bashrc
+# COPY config/bash/kk-completion /usr/share/bash-completion/completions/kk
 
 SHELL ["/bin/bash"]
-# ENTRYPOINT [ "bash" ]
-CMD ["bash"]
+ENTRYPOINT ["/bin/bash"]
 
 

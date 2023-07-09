@@ -1,0 +1,8 @@
+cluster:
+  bootstrap:
+    - name: argocd
+      enabled: yes # to enable argocd release ( autodeploy requires argocd enable = yes)
+      namespace: argocd # what namespace it's creating argocd
+      password: "Password123" # set default password for admin
+      domain: 'rec.la' # rec.la is resolving 127.0.0.1 and we are able to get their letsencrypt certs.
+      tls_folder: /tmp

@@ -1,0 +1,100 @@
+#!/bin/bash
+
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+
+apply(){
+
+  local KK_CLUSTER_PLAN="$1"
+  
+  local KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER="${KK_CLUSTER_PLAN%/*}/bootstrap/argocd/"
+  mkdir -p $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER
+  # cat $KK_CLUSTER_PLAN | yq
+  local KK_BOOTSTRAP_YML_ARGOCD=$(yq e -o=json ".cluster.bootstrap[]|select(.name == \"argocd\") " $KK_CLUSTER_PLAN)
+
+  # Required variables
+  local KK_BOOTSTRAP_ARGOCD_NS=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".namespace"`
+  local KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".password"`
+  local KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".domain"`
+  local KK_BOOTSTRAP_ARGOCD_TLS_FOLDER=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".tls_folder"`
+
+  # TLS secrets creation
+  if [ "$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME" == "rec.la" ];then
+    curl -s https://www.rec.la/rec.la-bundle.crt -o $KK_BOOTSTRAP_ARGOCD_TLS_FOLDER/tls.crt 
+    curl -s https://www.rec.la/rec.la-key.pem -o $KK_BOOTSTRAP_ARGOCD_TLS_FOLDER/tls.key
+  fi
+
+  # Creating Kubernetes resources
+  kubectl create namespace $KK_BOOTSTRAP_ARGOCD_NS \
+    --dry-run=client --output=yaml > $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER/_argocd-namespace.yml
+
+  for KK_BOOTSTRAP_ARGOCD_SECRET_NAME_TMP in "argocd-server-tls" "argocd-repo-server-tls" "argocd-dex-server-tls"; do
+  kubectl create -n $KK_BOOTSTRAP_ARGOCD_NS secret tls $KK_BOOTSTRAP_ARGOCD_SECRET_NAME_TMP \
+    --cert=$KK_BOOTSTRAP_ARGOCD_TLS_FOLDER/tls.crt  \
+    --key=$KK_BOOTSTRAP_ARGOCD_TLS_FOLDER/tls.key \
+    --dry-run=client --output=yaml > $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER/$KK_BOOTSTRAP_ARGOCD_SECRET_NAME_TMP.yml
+  done 
+
+  # Argocd Install Script
+  curl -sLo $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER/argocd-crd.yml https://raw.githubusercontent.com/argoproj/argo-cd/v2.7.6/manifests/install.yaml
+
+  # Argocd Ingress Creation
+  cat $KK_BOOTSTRAP_CURRENT_FOLDER/argocd-ingress.yml |  sed "s/\$ARGOCD_DOMAIN_NAME/$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME/g" > $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER/ingress.yml
+
+  # Applying Manifests
+  kubectl -n  $KK_BOOTSTRAP_ARGOCD_NS apply -f $KK_BOOTSTRAP_ARGOCD_PLAN_FOLDER/ &>/dev/null
+  kubectl wait --namespace $KK_BOOTSTRAP_ARGOCD_NS --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=180s &>/dev/null
+
+  until $(curl --output /dev/null --silent --head --fail https://argocd.$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME); do
+    sleep 2
+  done # waiting for argocd service to start
+
+  # Argocd setup default password from YAML
+  local KK_BOOTSTRAP_ARGOCD_CURRENT_PASSWORD=""
+  argocd login argocd.$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME --username admin --password $KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD &>/dev/null
+  if [ "$?" != 0 ]; then
+
+    while [ "${#KK_BOOTSTRAP_ARGOCD_CURRENT_PASSWORD}" == 0 ]; do
+      KK_BOOTSTRAP_ARGOCD_CURRENT_PASSWORD=`argocd admin initial-password -n $KK_BOOTSTRAP_ARGOCD_NS| head -n1`
+    done
+
+    argocd login argocd.$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME --username admin --password $KK_BOOTSTRAP_ARGOCD_CURRENT_PASSWORD &>/dev/null
+    argocd account update-password --account admin --current-password $KK_BOOTSTRAP_ARGOCD_CURRENT_PASSWORD --new-password $KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD &>/dev/null
+
+    argocd cluster add -y $(kubectl config get-contexts -o name) &>/dev/null
+
+  fi
+  
+  echo "
+🚜 your argocd is ready: https://argocd.rec.la
+User: root
+Password: $KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD"
+
+}
+
+bootstrap_argocd(){
+  local KK_BOOTSTRAP_NS_APP=argocd
+  local KK_BOOTSTRAP_YML=$1
+  local KK_BOOTSTRAP_RESOURCE_FILE="$KK_BOOTSTRAP_CURRENT_FOLDER/$KK_BOOTSTRAP_NS_APP.yml"
+  local KK_BOOTSTRAP_RESOURCE_ITEM="$(yq '.cluster.bootstrap' -o=json $KK_BOOTSTRAP_RESOURCE_FILE )"
+
+  yq -i ea "del(.cluster.bootstrap[] | select(.name == \"$KK_BOOTSTRAP_NS_APP\" ))" $KK_BOOTSTRAP_YML
+  yq -i ea -o=yaml ".cluster.\"bootstrap\"+=$KK_BOOTSTRAP_RESOURCE_ITEM" $KK_BOOTSTRAP_YML
+}
+
+
+
+bootstrap(){
+
+  yq -i ".cluster.plan.bootstrap.argocd.apply.started = \"$(date +%F_%T)\"" $1
+
+  bootstrap_argocd $1
+  echo "Setting Argocd from kk bootstrap 🐙"
+  apply $1
+  [ "$?" == "1" ] && yq -i ".cluster.plan.bootstrap.argocd.apply.status = \"failed after apply\"" $1 && return 1
+  yq -i ".cluster.plan.bootstrap.argocd.apply.finished = \"$(date +%F_%T)\"" $1
+
+}
+
+
+$@

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+
+KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+
 kk_cluster(){
    case "$1" in
     get) echo $(kind get clusters | tr "\n" " ");;
@@ -7,57 +10,36 @@ kk_cluster(){
   esac
 }
 
-kk_k8s(){
-  local KK_CUSTOM_CMD=()
-  local NEW_ENTRY=$2
-
-  case "$1" in
-    ns|namespace) KK_CUSTOM_CMD=("Namespace" "kk get ns" "kubectl get ns $NEW_ENTRY" "kubectl config set-context --current --namespace=$NEW_ENTRY");;
-    ct|context) KK_CUSTOM_CMD=("Context" "kubectl config get-contexts -o name" "kubectl config get-contexts $NEW_ENTRY" "kubectl config use-context $NEW_ENTRY ");;
-    *) echo "kk_k8s missing feature" ;; 
-  esac
-  
-  if [ "$NEW_ENTRY" == "" ] ;then
-    echo $(${KK_CUSTOM_CMD[1]})
-  elif [ "$NEW_ENTRY" != "$KK_CONTEXT" ] ;then 
-    $(${KK_CUSTOM_CMD[2]}) &>/dev/null
-    if [ "$?" == "0" ];then
-      $("${KK_CUSTOM_CMD[3]}")
-      echo "${KK_CUSTOM_CMD[0]} has changed to $NEW_ENTRY"
-    else
-      echo "${KK_CUSTOM_CMD[0]} $NEW_ENTRY not found"
-    fi
-  fi
-}
-
 help(){
-  echo -e "Usage:
-    kk [command] [args]
+  echo -e "Usage:\n    kk <module> <resource> <args>\n\n
+    Use kk <module> --help           for more information about a given command.
+    
+    Modules:
 
-    bootstrap           embed bootstrap features to quick start your cluster
-                        features: cluster, nginx-cluster-ingress, argocd
-                        
-    # argocd --help        Argocd Commands
+      bootstrap                       To create resources quickly
+                                      resources: cluster, namespace
+
+      ct | context                    To quickly manage k8s contexts
+
+      ns | namespace                  To quickly manage k8s namespace
+
+      ns | namespace                  To quickly release k8s resources to cluster
+
+      cluster                         To quickly manage kind cluster
+                                      flags: 
+                                        get     Display cluster information
+                                        delete  To delete a k8s cluster (kind)
+                                      usage: kk <flag> cluster <cluster name>
 
   "
 }
 
-
-kk_main(){
-  KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
-  case "$1" in
-    bootstrap) $KK_CURRENT_FOLDER/../modules/bootstrap $@;;
-    ns|namespace|ct|context) kk_k8s $1 $2 ;;
-    create|get|delete) 
-      case "$2" in
-        cluster|clusters) kk_cluster $@;;
-        *) kubectl $@ ;; 
-      esac
-    ;;
-    pretty_bash) pretty_bash;;
-    ""|help) help;;
-    *) kk_main get $@ ;; 
-  esac
-}
-
-kk_main $@
+  
+case "$1" in
+  bootstrap) $KK_CURRENT_FOLDER/../modules/bootstrap/bootstrap $@;;
+  ns|namespace) $KK_CURRENT_FOLDER/../modules/kubernetes/namespace $2 ;;
+  ct|context) $KK_CURRENT_FOLDER/../modules/kubernetes/context $2 ;;
+  completion) cat $KK_CURRENT_FOLDER/../modules/complete ;;
+  ""|help) help;;
+  *) kubectl $@ ;; 
+esac

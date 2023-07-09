@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+NEW_NS=$1
+
+if [ "$NEW_NS" == "" ] ;then
+  echo "$(kk 'get' 'ns' | awk 'NR>1 {print $1}'  | sed "s/$KK_NAMESPACE /$KK_NAMESPACE*/g")"
+elif [ "$NEW_NS" != "$KK_NAMESPACE" ] ;then 
+  kubectl get ns $NEW_NS &>/dev/null
+  if [ "$?" == "0" ];then
+    kubectl config set-context --current --namespace=$NEW_NS  &>/dev/null
+    echo "Namespace has changed to $NEW_NS"
+  else
+    echo "Namespace $NEW_NS not found"
+  fi
+fi

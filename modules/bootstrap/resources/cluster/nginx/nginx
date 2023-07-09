@@ -1,0 +1,36 @@
+#!/bin/bash
+
+
+apply(){
+
+  local KK_CLUSTER_PLAN=$1
+
+  [ "$?" == "1" ] && yq -i ".cluster.plan.bootstrap.nginx.apply.status = \"failed\"" $KK_CLUSTER_PLAN && return 1
+  
+  KK_CLUSTER_INGRESS_FILE="${KK_CLUSTER_PLAN%/*}/bootstrap/cluster-ingress.yml"
+  mkdir -p "${KK_CLUSTER_INGRESS_FILE%/*}"
+
+  curl -sLo $KK_CLUSTER_INGRESS_FILE https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.0/deploy/static/provider/kind/deploy.yaml
+  sed -i '/^        - --publish-status-address=localhost.*/a\        - --enable-ssl-passthrough' $KK_CLUSTER_INGRESS_FILE
+
+  kubectl apply -f $KK_CLUSTER_INGRESS_FILE &> /dev/null
+
+  kubectl wait --namespace ingress-nginx \
+    --for=condition=ready pod \
+    --selector=app.kubernetes.io/component=controller \
+    --timeout=180s &> /dev/null
+
+  return 0
+
+}
+
+
+bootstrap(){
+  echo "Setting up the Nginx Ingress 🌐"
+  yq -i ".cluster.plan.bootstrap.nginx.apply.started = \"$(date +%F_%T)\"" $1
+  apply $1
+  yq -i ".cluster.plan.bootstrap.nginx.apply.finished = \"$(date +%F_%T)\"" $1
+}
+
+
+$@

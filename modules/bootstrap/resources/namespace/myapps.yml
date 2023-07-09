@@ -20,11 +20,13 @@ cluster:
           strategy: argocd
         - app: hello # app name
           repo: https://github.com/brpedromaia/kk # app repository
-          path: resources/examples/apps/hello # app git path to helm or k8s manifests
+          # path: resources/examples/apps/hello # app git path to helm or k8s manifests
+          path: /opt/kk/examples/apps/simple-apps/hello/
           branch: main # branch name or tag name
           strategy: local
         - app: agnhost # app name
           repo: https://github.com/brpedromaia/kk # app repository
-          path: resources/examples/apps/agnhost # app git path to helm or k8s manifests
+          # path: resources/examples/apps/agnhost # app git path to helm or k8s manifests
+          path: /opt/kk/examples/apps/simple-apps/agnhost/
           branch: main # branch name or tag name
           strategy: local

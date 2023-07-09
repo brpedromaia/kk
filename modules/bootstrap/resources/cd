@@ -1,0 +1,40 @@
+#!/bin/bash
+
+
+
+
+
+apply_apps(){
+  KK_BOOTSTRAP_NS_APP=$1
+  KK_BOOTSTRAP_YML=$2
+  KK_BOOTSTRAP_YML_APPS=`yq e -o=json ".cluster.namespaces[]|select(.name == \"$KK_BOOTSTRAP_NS_APP\") .apps" $KK_BOOTSTRAP_YML`
+
+  local AUTOD_APP_LENGTH=`echo $KK_BOOTSTRAP_YML_APPS | yq '.|length'`
+  ARGOCD_LOGIN=false
+  for ((ii = 0 ; ii < $AUTOD_APP_LENGTH ; ii++ )); do
+
+    local AUTOD_APP_NAME=$(echo $KK_BOOTSTRAP_YML_APPS| yq ".$ii.app")
+    local AUTOD_APP_REPO=$(echo $KK_BOOTSTRAP_YML_APPS| yq ".$ii.repo")
+    local AUTOD_APP_PATH=$(echo $KK_BOOTSTRAP_YML_APPS| yq ".$ii.path")
+    local AUTOD_APP_BRANCH=$(echo $KK_BOOTSTRAP_YML_APPS| yq ".$ii.branch")
+    local AUTOD_APP_STRATEGY=$(echo $KK_BOOTSTRAP_YML_APPS| yq ".$ii.strategy")
+
+    if [ "$AUTOD_APP_STRATEGY" == "argocd" ];then
+      local KK_BOOTSTRAP_YML_ARGOCD=$(yq e -o=json ".cluster.bootstrap[]|select(.name == \"argocd\") " $KK_BOOTSTRAP_YML)
+      local KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".password"`
+      local KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME=`echo $KK_BOOTSTRAP_YML_ARGOCD | yq ".domain"`
+      [ $ARGOCD_LOGIN == false ] && argocd login argocd.$KK_BOOTSTRAP_ARGOCD_DOMAIN_NAME --username admin --password $KK_BOOTSTRAP_ARGOCD_ADMIN_PASSWORD
+      argocd app create $AUTOD_APP_NAME --repo $AUTOD_APP_REPO \
+              --revision $AUTOD_APP_BRANCH \
+              --path $AUTOD_APP_PATH \
+              --dest-server "https://kubernetes.default.svc" \
+              --dest-namespace $KK_BOOTSTRAP_NS_APP \
+              --sync-policy auto
+    else
+      echo "Deploying app $AUTOD_APP_NAME from path"
+      kubectl apply -f $AUTOD_APP_PATH
+    fi
+  done
+}
+
+apply_apps $@
