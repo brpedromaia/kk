@@ -1,129 +1,52 @@
 #!/bin/bash
 
-autodeploy(){
-  local ARGOCD_DOMAIN_NAME=`yq ".cluster.argocd.domain" $KK_AUTO_CREATION_FILE`
-  until $(curl --output /dev/null --silent --head --fail https://argocd.$ARGOCD_DOMAIN_NAME); do
-    printf 'Waiting for argocd become UP'
-    sleep 2
-  done
-  sleep 5
-  local AUTOD_NS_LENGTH=`yq ".cluster.namespaces|length" $KK_AUTO_CREATION_FILE`
-  for ((i = 0 ; i < $AUTOD_NS_LENGTH ; i++ )); do
-    local AUTOD_NS_NAME=`yq ".cluster.namespaces.$i.name" $KK_AUTO_CREATION_FILE`
-    kubectl create ns $AUTOD_NS_NAME
-    kubectl create clusterrolebinding $AUTOD_NS_NAME-default-admin-binding --clusterrole=cluster-admin --serviceaccount=$AUTOD_NS_NAME:default
-    local AUTOD_APP_LENGTH=`yq ".cluster.namespaces.$i.apps|length" $KK_AUTO_CREATION_FILE`
-    for ((ii = 0 ; ii < $AUTOD_APP_LENGTH ; ii++ )); do
-      local AUTOD_APP_NAME=`yq ".cluster.namespaces.$i.apps.$ii.app" $KK_AUTO_CREATION_FILE`
-      local AUTOD_APP_REPO=`yq ".cluster.namespaces.$i.apps.$ii.repo" $KK_AUTO_CREATION_FILE`
-      local AUTOD_APP_PATH=`yq ".cluster.namespaces.$i.apps.$ii.path" $KK_AUTO_CREATION_FILE`
-      local AUTOD_APP_BRANCH=`yq ".cluster.namespaces.$i.apps.$ii.branch" $KK_AUTO_CREATION_FILE`
-      argocd app create $AUTOD_APP_NAME --repo $AUTOD_APP_REPO --revision $AUTOD_APP_BRANCH --path $AUTOD_APP_PATH --dest-server https://kubernetes.default.svc --dest-namespace $AUTOD_NS_NAME --sync-policy auto
-    done
-  done
+
+KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+
+kk_cluster(){
+   case "$1" in
+    get) echo $(kind get clusters | tr "\n" " ");;
+    delete) kind delete cluster -n $3;;
+  esac
 }
 
-argocd_bootstrap(){
+help(){
+  echo -e "Usage:\n    kk <module> <resource> <args>\n\n
+    Use kk <module> --help           for more information about a given command.
+    
+    Modules:
 
-  # Required variables
-  local ARGOCD_NS=`yq ".cluster.argocd.namespace" $KK_AUTO_CREATION_FILE`
-  local ARGOCD_ADMIN_PASSWORD=`yq ".cluster.argocd.password" $KK_AUTO_CREATION_FILE`
-  local ARGOCD_DOMAIN_NAME=`yq ".cluster.argocd.domain" $KK_AUTO_CREATION_FILE`
-  local ARGOCD_TLS_FOLDER=`yq ".cluster.argocd.tls_folder" $KK_AUTO_CREATION_FILE`
-  kubectl create namespace $ARGOCD_NS
+      bootstrap                       To create resources quickly
+                                      resources: cluster, namespace
+
+      ct | context                    To quickly manage k8s contexts
+
+      ns | namespace                  To quickly manage k8s namespace
+
+      ns | namespace                  To quickly release k8s resources to cluster
+
+      cluster                         To quickly manage kind cluster
+                                      flags: 
+                                        get     Display cluster information
+                                        delete  To delete a k8s cluster (kind)
+                                      usage: kk <flag> cluster <cluster name>
+
+  "
+}
+
   
-  # TLS secrets creation
-  if [ "$ARGOCD_DOMAIN_NAME" == "rec.la" ];then
-    curl -s https://www.rec.la/rec.la-bundle.crt -o $ARGOCD_TLS_FOLDER/tls.crt 
-    curl -s https://www.rec.la/rec.la-key.pem -o $ARGOCD_TLS_FOLDER/tls.key
-  fi
-  ls -lha /$ARGOCD_TLS_FOLDER/tls*
-  for ARGOCD_SECRET_NAME_TMP in "argocd-server-tls" "argocd-repo-server-tls" "argocd-dex-server-tls"; do
-    kubectl create -n $ARGOCD_NS secret tls $ARGOCD_SECRET_NAME_TMP --cert=$ARGOCD_TLS_FOLDER/tls.crt  --key=$ARGOCD_TLS_FOLDER/tls.key
-  done 
-
-  # Argocd install manifest
-  kubectl apply -n $ARGOCD_NS -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.7.6/manifests/install.yaml
-  # Argocd Ingress Creation
-  cat /usr/local/kk/argocd-ingress.yml |  sed "s/\$ARGOCD_DOMAIN_NAME/$ARGOCD_DOMAIN_NAME/g" | kubectl -n $ARGOCD_NS apply -f -
-  kubectl wait --namespace $ARGOCD_NS --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=180s
-  sleep 20 # waiting for argocd service to start
-  # Argocd setup default password from YAML
-  local ARGOCD_CURRENT_PASSWORD=""
-  while [ "${#ARGOCD_CURRENT_PASSWORD}" == 0 ]; do
-    ARGOCD_CURRENT_PASSWORD=`argocd admin initial-password -n $ARGOCD_NS| head -n1`
-  done
-  argocd login argocd.$ARGOCD_DOMAIN_NAME --username admin --password $ARGOCD_CURRENT_PASSWORD
-  argocd account update-password --account admin --current-password $ARGOCD_CURRENT_PASSWORD --new-password $ARGOCD_ADMIN_PASSWORD
-
-  argocd cluster add -y $(kubectl config get-contexts -o name)
-}
-
-autocreate(){
-  local KK_CLUSTER_AUTOCREATION=`yq ".cluster.autocreation" $KK_AUTO_CREATION_FILE`
-  [ "$KK_CLUSTER_AUTOCREATION" != "yes" ] && echo "autocreation skipped" && return 0
-  
-  local AUTOD_CLUSTER_NAME=`yq ".cluster.name" $KK_AUTO_CREATION_FILE`
-  local AUTOD_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_AUTO_CREATION_FILE`
-  kind get clusters | grep $AUTOD_CLUSTER_NAME &>/dev/null
-  if [ "$?" == 0 ];then
-    echo "Cluster $AUTOD_CLUSTER_NAME is already created"
-    KK_CONTEXT=""
-    ct "kind-$AUTOD_CLUSTER_NAME"
-    return 0
-  fi
-  if [ "$AUTOD_CLUSTER_LENGTH" == "0" ];then
-    kkind singlenode "$AUTOD_CLUSTER_NAME"
-  else
-    kkind multinode "$AUTOD_CLUSTER_LENGTH" "$AUTOD_CLUSTER_NAME"
-  fi
-  
-  local KK_ARGOCD_ENABLED=`yq ".cluster.argocd.enabled" $KK_AUTO_CREATION_FILE`
-  if [ "$KK_ARGOCD_ENABLED" == "yes" ];then
-    argocd_bootstrap
-    autodeploy
-  fi
-}
-
-ns(){
-  local NEW_NS=$1
-  if [ "$NEW_NS" == "" ] ;then
-      echo "$(kk 'get' 'ns' | awk 'NR>1 {print $1}'  | sed "s/$KK_NAMESPACE /$KK_NAMESPACE*/g")"
-  elif [ "$NEW_NS" != "$KK_NAMESPACE" ] ;then 
-    kubectl get ns $NEW_NS &>/dev/null
-    if [ "$?" == "0" ];then
-      kubectl config set-context --current --namespace=$NEW_NS  &>/dev/null
-      export KK_NAMESPACE="$NEW_NS" 
-      echo "Namespace has changed to $NEW_NS"
-    else
-      echo "Namespace $NEW_NS not found"
-    fi
-  fi
-}
-
-ct(){
-  local NEW_CTX=$1
-  if [ "$NEW_CTX" == "" ] ;then
-    echo $(kubectl config get-contexts -o name)
-  elif [ "$NEW_CTX" != "$KK_CONTEXT" ] ;then 
-    kubectl config get-contexts $NEW_CTX &>/dev/null
-    if [ "$?" == "0" ];then
-      kubectl config use-context $NEW_CTX 
-      export KK_CONTEXT="$NEW_CTX" 
-    else
-      echo "Context $NEW_CTX not found"
-    fi
-  fi
-}
-
-source $HOME/.kkrc
 case "$1" in
-  autotest) autotest;;
-  autodeploy) autodeploy;;
-  autocreate) autocreate;;
-  autotests) autotests;;
-  ns|namespace) ns $2 ;;
-  ct|context) ct $2;;
-  pretty_bash) pretty_bash;;
+  bootstrap) $KK_CURRENT_FOLDER/../modules/bootstrap/bootstrap $@;;
+  ns|namespace) $KK_CURRENT_FOLDER/../modules/kubernetes/namespace $2 ;;
+  ct|context) $KK_CURRENT_FOLDER/../modules/kubernetes/context $2 ;;
+  completion) cat $KK_CURRENT_FOLDER/../modules/complete ;;
+  get|delete)
+    case "$2" in
+      cluster|clusters) kk_cluster $@;;
+      *) kubectl $@ ;; 
+    esac
+  ;;
+    
+  ""|help) help;;
   *) kubectl $@ ;; 
 esac

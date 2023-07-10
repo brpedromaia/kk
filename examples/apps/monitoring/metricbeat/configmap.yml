@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metricbeat-config
+  namespace: monitoring
+  labels:
+    application: metricbeat
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+data:
+  metricbeat.yml: |-
+    metricbeat.config.modules:
+      path: ${path.config}/modules.d/*.yml
+      reload.enabled: false
+      
+    processors:
+      - add_kubernetes_metadata: ~
+
+    output.elasticsearch:
+      hosts: ['${ELASTIC_HOST:elasticsearch}:${ELASTIC_PORT:9200}']
+      username: ${ELASTIC_USERNAME:elastic}
+      # password: ${ELASTIC_PASSWORD}
+
+    # setup.dashboards:
+    #   enabled: true
+
+    # setup.kibana:
+    #   host: 'http://${KIBANA_CUSTOM_HOST:kibana}:${KIBANA_CUSTOM_PORT:5601}'

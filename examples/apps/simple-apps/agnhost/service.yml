@@ -1,0 +1,32 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: agnhost
+  labels:
+    application: agnhost
+    version: "2.39"
+    release: "r7"
+    stage: development
+    component: example-apps
+    part-of: kk-example
+  annotations:
+    co.elastic.monitor/0.type: tcp
+    co.elastic.monitor/0.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:8080
+    co.elastic.monitor/0.schedule: "@every 5s"
+    co.elastic.monitor/0.name: agnhost-svc
+    co.elastic.monitor/0.tags.0: agnhost
+    co.elastic.monitor/0.tags.1: development
+    co.elastic.monitor/0.tags.2: service
+    co.elastic.monitor/1.type: http
+    co.elastic.monitor/1.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:8080
+    co.elastic.monitor/1.schedule: "@every 5s"
+    co.elastic.monitor/1.name: agnhost-svc
+    co.elastic.monitor/1.tags.0: agnhost
+    co.elastic.monitor/1.tags.1: development
+    co.elastic.monitor/1.tags.2: service
+spec:
+  selector:
+    application: agnhost
+  ports:
+  - port: 8080

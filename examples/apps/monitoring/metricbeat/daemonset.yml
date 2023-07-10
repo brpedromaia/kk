@@ -1,0 +1,92 @@
+---
+# Deploy a Metricbeat instance per node for node metrics retrieval
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: metricbeat
+  namespace: monitoring
+  labels:
+    application: metricbeat
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+spec:
+  selector:
+    matchLabels:
+      application: metricbeat
+  template:
+    metadata:
+      labels:
+        application: metricbeat
+      annotations:
+        co.elastic.monitor/0.type: icmp
+        co.elastic.monitor/0.hosts: ${data.host}
+        co.elastic.monitor/0.schedule: "@every 5s"
+        co.elastic.monitor/0.name: ${data.kubernetes.pod.name}
+        co.elastic.monitor/0.tags.0: metricbeat
+        co.elastic.monitor/0.tags.1: development
+        co.elastic.monitor/0.tags.2: pod
+    spec:
+      serviceAccountName: metricbeat
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: metricbeat
+        image: docker.elastic.co/beats/metricbeat:7.17.11
+        args: [
+          "-c", "/etc/metricbeat.yml",
+          "-e",
+        ]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: 200m
+            memory: 500Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/metricbeat.yml
+          readOnly: true
+          subPath: metricbeat.yml
+        - name: data
+          mountPath: /usr/share/metricbeat/data
+        - name: modules
+          mountPath: /usr/share/metricbeat/modules.d
+          readOnly: true
+        - name: proc
+          mountPath: /hostfs/proc
+          readOnly: true
+        - name: cgroup
+          mountPath: /hostfs/sys/fs/cgroup
+          readOnly: true
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: cgroup
+        hostPath:
+          path: /sys/fs/cgroup
+      - name: config
+        configMap:
+          defaultMode: 0640
+          name: metricbeat-config
+      - name: modules
+        configMap:
+          defaultMode: 0640
+          name: metricbeat-modules
+      - name: data
+        hostPath:
+          # When metricbeat runs as non-root user, this directory needs to be writable by group (g+w)
+          path: /var/lib/metricbeat-data
+          type: DirectoryOrCreate

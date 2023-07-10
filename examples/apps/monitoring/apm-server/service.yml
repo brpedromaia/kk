@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: apm-server
+  namespace: monitoring
+  labels:
+    application: apm-server
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+  annotations:
+      co.elastic.monitor/0.type: tcp
+      co.elastic.monitor/0.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:8200
+      co.elastic.monitor/0.schedule: "@every 5s"
+      co.elastic.monitor/0.name: apm-server-svc
+      co.elastic.monitor/0.tags.0: apm-server
+      co.elastic.monitor/0.tags.1: development
+      co.elastic.monitor/0.tags.2: service
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8200
+      targetPort: 8200
+  selector:
+    application: apm-server

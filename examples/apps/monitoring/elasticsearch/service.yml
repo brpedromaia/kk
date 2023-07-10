@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: monitoring
+  labels:
+    application: elasticsearch
+    version: "7.17.11"
+    release: "r7"
+    stage: development
+    component: elasticstack
+    part-of: observabillity
+  annotations:
+    co.elastic.monitor/0.type: tcp
+    co.elastic.monitor/0.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:9200
+    co.elastic.monitor/0.schedule: "@every 5s"
+    co.elastic.monitor/0.name: elasticsearch-svc
+    co.elastic.monitor/0.tags.0: elasticsearch
+    co.elastic.monitor/0.tags.1: development
+    co.elastic.monitor/0.tags.2: service
+    co.elastic.monitor/1.type: http
+    co.elastic.monitor/1.hosts: ${data.kubernetes.service.name}.${data.kubernetes.namespace}.svc.cluster.local:9200/_cluster/health
+    co.elastic.monitor/1.schedule: "@every 5s"
+    co.elastic.monitor/1.name: elasticsearch-svc
+    co.elastic.monitor/1.tags.0: elasticsearch
+    co.elastic.monitor/1.tags.1: development
+    co.elastic.monitor/1.tags.2: service
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9200
+      targetPort: 9200
+  selector:
+    application: elasticsearch

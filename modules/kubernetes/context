@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+NEW_CTX=$1
+
+if [ "$NEW_CTX" == "" ] ;then
+  echo $(kubectl config get-contexts -o name)
+elif [ "$NEW_CTX" != "$KK_CONTEXT" ] ;then 
+  kubectl config get-contexts $NEW_CTX &>/dev/null
+  if [ "$?" == "0" ];then
+    kubectl config use-context $NEW_CTX 
+    echo "Context has changed to $NEW_NS"
+  else
+    echo "Context $NEW_CTX not found"
+  fi
+fi

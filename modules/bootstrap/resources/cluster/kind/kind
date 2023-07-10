@@ -1,0 +1,84 @@
+#!/bin/bash
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+
+apply(){
+
+  local KK_CLUSTER_PLAN="$1"
+  local KK_CLUSTER_KIND_BASE_CONFIG="$KK_BOOTSTRAP_CURRENT_FOLDER/kind-config.yml"
+  validation $KK_CLUSTER_PLAN
+
+  [ "$?" == "1" ] && yq -i ".cluster.apply.status = \"failed before apply\"" $1 && return 1
+  local KK_CLUSTER_PLAN_FOLDER="${KK_CLUSTER_PLAN%/*}"
+
+  local KK_CLUSTER_NAME=`yq ".cluster.name" $KK_CLUSTER_PLAN`
+  local KK_CLUSTER_ALREADY_CREATED="no"
+  kind get clusters | grep $KK_CLUSTER_NAME &>/dev/null
+  if [ "$?" == 0 ];then
+    echo "Cluster $KK_CLUSTER_NAME is already created"
+    local KK_CONTEXT=""
+    kk ct "kind-$KK_CLUSTER_NAME"
+    local KK_CLUSTER_ALREADY_CREATED="yes"
+  fi
+  if [ "$KK_CLUSTER_ALREADY_CREATED" == "no" ];then
+    local KK_CLUSTER_LENGTH=`yq ".cluster.workers" $KK_CLUSTER_PLAN`
+
+    if [ "$KK_CLUSTER_LENGTH" == "0" ] ||  [ "$KK_CLUSTER_LENGTH" == "null" ];then
+      kind create cluster -n $KK_CLUSTER_NAME
+    else
+      yq -i 'del(.nodes[] | select(.role == "workers"))' $KK_CLUSTER_KIND_BASE_CONFIG
+      cp -f $KK_CLUSTER_KIND_BASE_CONFIG $KK_CLUSTER_PLAN_FOLDER/kind-config.yml
+      for ((i = 1 ; i <= $KK_CLUSTER_LENGTH ; i++ )); do
+        yq -i ".nodes.$i.role = \"worker\"" $KK_CLUSTER_PLAN_FOLDER/kind-config.yml
+      done
+      kind create cluster -n $KK_CLUSTER_NAME --config $KK_CLUSTER_PLAN_FOLDER/kind-config.yml
+    fi
+  fi
+
+  local KK_CLUSTER_BOOTRAP=$(yq ".cluster.bootstrap | .[].name" $KK_CLUSTER_PLAN| tr '\n' ',')
+  if [ "$KK_CLUSTER_BOOTRAP" != "null" ];then
+    local KK_BOOTSTRAP_ITEMS=(${KK_CLUSTER_BOOTRAP//,/ })
+    for KK_BOOTSTRAP_ITEM in ${KK_BOOTSTRAP_ITEMS[@]};do
+      $KK_BOOTSTRAP_CURRENT_FOLDER/../$KK_BOOTSTRAP_ITEM/$KK_BOOTSTRAP_ITEM bootstrap $KK_CLUSTER_PLAN
+    done
+  fi
+
+
+  return 0
+
+}
+
+
+validation(){
+
+  local KK_FILE=$1
+  local KK_REQ_FIELDS=(cluster.name)
+  local KK_REQ_ERROR=""
+
+  [ ! -f "$KK_FILE" ] && KK_REQ_ERROR="File not found: $KK_FILE"
+
+  for KK_REQ_FIELD in ${KK_REQ_FIELDS[@]};do
+    [ "$(yq .$KK_REQ_FIELD $KK_FILE)" == "null" ] && KK_REQ_ERROR="Field $KK_REQ_FIELD is REQUIRED\n"
+  done
+
+  [ "$KK_REQ_ERROR" != "" ] && echo -e "$KK_REQ_ERROR" && return 1
+
+  return 0
+  
+}
+
+
+bootstrap(){
+
+  yq -i ".cluster.plan.apply.started = \"$(date +%F_%T)\"" $1
+
+  validation $1
+  [ "$?" == "1" ] && yq -i ".cluster.plan.apply.status = \"failed before apply\"" $1 && return 1
+  yq -i ".cluster.plan.apply.validated = \"$(date +%F_%T)\"" $1
+
+  apply $1
+  [ "$?" == "1" ] && yq -i ".cluster.plan.bootstrap.nginx.apply.status = \"failed after apply\"" $1 && return 1
+  yq -i ".cluster.plan.bootstrap.nginx.apply.finished = \"$(date +%F_%T)\"" $1
+}
+
+$@

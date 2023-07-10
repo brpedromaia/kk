@@ -1,0 +1,60 @@
+#!/bin/bash
+
+KK_BOOTSTRAP_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+KK_FRAMEWORK_VERSION=v1-alpha
+
+kk_bootstrap_help(){
+
+  echo -e "Usage:\n    kk bootstrap [resource] [args]\n\nkk Cluster Management Commands:
+    
+    Resources:
+
+      cluster [cluster name ]         To create a new k8s cluster (kind)
+        args:
+          --workers 1..10             Number of nodes, default is 0
+          --bootstrap item1,item2     To quick create a new cluster with working tools
+                                      options: nginx argocd
+                                      e.g.: kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd
+          --namespaces                To quick create the kk namespaces
+                                      options: monitoring,myapps
+                                      e.g.: kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --namespaces monitoring,myapps
+      namespace
+        args:
+          -c | --cluster              Number of nodes, default is 0
+                                      e.g. kk bootstrap namespace -c myapps -f myapps.yml
+    Bootstrap args:   
+      --plan                          Run in plan (dry run) mode, creating files inside the default plan folder ($HOME/.kk/)
+      --apply                         To Assume yes; assume that the answer to any question which would be asked is yes.
+      -f='' | --file=''               To Run a created plan from specific file
+
+    e.g.: kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --namespaces monitoring,myapps
+
+    Cluster Info:
+
+    kk cluster
+    kk get cluster                    Display cluster information
+
+    
+
+    Cluster Deletion:
+
+    kk delete cluster [cluster name]  To delete a k8s cluster (kind)
+
+  "
+}
+
+bootstrap(){
+  KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
+  if [ "$2" != "" ];then
+    case "${1}" in
+      cluster) $KK_CURRENT_FOLDER/resources/cluster/cluster $@;;
+      namespace)
+        $KK_CURRENT_FOLDER/resources/namespace/namespace $@;;
+      "" | -h | --help) kk_bootstrap_help ;;
+    esac
+  else
+    kk_bootstrap_help
+  fi
+}
+
+bootstrap ${@:2}

@@ -1,0 +1,32 @@
+cluster:
+  namespaces:
+    - name: myapps # namespace name to release through autodeploy (requires argocd enabled)
+      enabled: yes
+      apps: # apps list with all apps to release into 'myns' namespace
+        - app: stakeater # app name
+          repo: https://github.com/stakater/Reloader.git # app repository
+          path: deployments/kubernetes/manifests # app git path to helm or k8s manifests
+          branch: 'v1.0.27' # branch name or tag name
+          strategy: argocd
+        - app: openresty # app name
+          repo: https://github.com/brpedromaia/openresty.git # app repository
+          path: chart # app git path to helm or k8s manifests
+          branch: main # branch name or tag name
+          strategy: argocd
+        - app: books # app name
+          repo: https://github.com/brpedromaia/simple-python-api.git # app repository
+          path: chart # app git path to helm or k8s manifests
+          branch: main # branch name or tag name
+          strategy: argocd
+        - app: hello # app name
+          repo: https://github.com/brpedromaia/kk # app repository
+          # path: resources/examples/apps/hello # app git path to helm or k8s manifests
+          path: /opt/kk/examples/apps/simple-apps/hello/
+          branch: main # branch name or tag name
+          strategy: local
+        - app: agnhost # app name
+          repo: https://github.com/brpedromaia/kk # app repository
+          # path: resources/examples/apps/agnhost # app git path to helm or k8s manifests
+          path: /opt/kk/examples/apps/simple-apps/agnhost/
+          branch: main # branch name or tag name
+          strategy: local
