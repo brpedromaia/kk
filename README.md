@@ -1,3 +1,18 @@
+# kk framework
+
+It is an ultra-simple containerised framework to quickly start a Kubernetes cluster (KIND) locally and bootstrap your apps.
+
+From a single command line, It's creating a new Kubernetes cluster (using KIND) with namespaces and apps quickly.
+
+From a YAML file, it's defined the cluster creation, namespace creation and apps to be deployed automatically 
+
+
+
+
+# Notes:
+> It's fully tested only in MacOS (Intel)
+> Pending tests: Win & Lin
+
 # Requirements:
 
 Docker > 20.0
@@ -5,26 +20,17 @@ Docker > 20.0
 docker --version
 Docker version 24.0.2, build cb74dfc
 ```
+Docker resources: 1 CPU and >=4GB
 
-# Notes:
-> It's fully tested only in MacOS (Intel)
-
-> Pending tests: Win & Lin
-# How kk framework works:
-
-It's a containirised framework to help the kubernetes cluster locally with examples.
-There are two ways to use that:
-
-1. Command line
-2. Automated Feature from yaml file
-
-## Framework tools version:
+## Container tools versions:
 
 | Tool | Version |
 | :---: | :---: |
 | kubectl | 1.27.3 |
 | kind | 0.20.0 |
 | argocd-cli | 2.7.7 |
+
+# How kk framework works:
 
 # Creating K8s Cluster with command line:
 
@@ -51,9 +57,6 @@ kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --namespaces
 kk with autocompletion:
 
 kk usage
-
-<details>
-<summary> click to expand </summary>
 
 ```
 [ 🐳 none 🏷  none ]$ kk
@@ -83,13 +86,10 @@ Usage:
 
 [ 🐳 none 🏷  none ]$ 
 ```
-</details>
+
 
 ### kk bootstrap usage:
 
-<details>
-<summary> click to expand </summary>
-  
 ```
 [ 🐳 none 🏷  none ]$  kk bootstrap 
 Usage:
@@ -130,8 +130,6 @@ kk Cluster Management Commands:
 
     kk delete cluster [cluster name]  To delete a k8s cluster (kind)
 ```
-
-</details>
 
 ### Creating my first cluster:
 
