@@ -41,8 +41,7 @@ docker run --privileged --rm -it --name kk \
   -v $HOME/.kube/config:/root/.kube/config \
   --net=host \
   alpine-docker:latest  
-  brpedromaia/kk:v3
-kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --namespaces myapps, --apply
+  brpedromaia/kk:v5
 [ 🐳 none 🏷  none ]$
 ```
 ### Why should I use that into my container run command?
@@ -131,15 +130,12 @@ kk Cluster Management Commands:
     kk delete cluster [cluster name]  To delete a k8s cluster (kind)
 ```
 
-### Creating my first cluster:
-
+### Quick Start mycluster
 ```
-kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --apply
+kk bootstrap cluster mycluster --workers 3 --bootstrap nginx --apply
 ```
 
-<details>
-<summary> click to expand the output </summary>
-
+output:
 ```
 Cluster Creation Plan:
 
@@ -156,21 +152,17 @@ Cool! kk framework has delivered your kind cluster 🥰
 mycluster cluster is ready to use!🚀
 
 Enjoy! Cheers 👋
-
-
 ```
 
 </details>
 
-### Creating my first cluster with example apps:
+### Quick Start mycluster with example apps:
 
 ```
 kk bootstrap cluster mycluster --workers 3 --bootstrap nginx,argocd --namespaces myapps, --apply
 ```
 
-<details>
-<summary> click to expand the output </summary>
-
+output:
 ```
 Cluster Creation Plan:
 
@@ -218,48 +210,26 @@ Enjoy! Cheers 👋
 
 
 ```
-</details>
+
 
 #### Testing example apps:
 
 ##### Openresty:
 ```
 curl -s https://playground.rec.la/health
+# {"status":"UP"}
 ```
-
-<details>
-<summary> click to expand the output </summary>
-
-```
-{"status":"UP"}
-```
-
-</details>
 
 ##### Hello:
 ```
 curl -s https://playground.rec.la/hello
+# Hello World
 ```
-
-<details>
-<summary> click to expand the output </summary>
-
-```
-Hello World
-```
-
-</details>
 
 ##### agnhost:
 ```
 curl -s https://playground.rec.la/agnhost
-```
-
-<details>
-<summary> click to expand the output </summary>
-
-```
-NOW: 2023-07-09 00:54:11.919462633 +0000 UTC m=+22.42053851
+# NOW: 2023-07-09 00:54:11.919462633 +0000 UTC m=+22.42053851
 ```
 
 </details>
@@ -268,9 +238,6 @@ NOW: 2023-07-09 00:54:11.919462633 +0000 UTC m=+22.42053851
 ```
 curl -s https://playground.rec.la/books/ |yq -P
 ```
-
-<details>
-<summary> click to expand the output </summary>
 
 ```yml
 metadata:
@@ -293,7 +260,7 @@ result:
     genre: Fantasy
 ```
 
-</details>
+
 
 # TODO:
 - [ ] better docs
