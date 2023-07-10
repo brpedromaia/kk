@@ -7,7 +7,7 @@ RUN /bin/sh -c apk update ;\
     chmod +x ./kubectl && mv ./kubectl /usr/bin/kubectl ;\
     curl -sLo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 ;\
     chmod +x ./kind && mv ./kind /usr/local/bin/kind ;\
-    curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 ;\
+    curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/v2.7.7/argocd-linux-amd64 ;\
     chmod +x ./argocd && mv ./argocd /usr/local/bin/argocd ;\
      rm -rf /var/cache/apk/* /tmp/* /sbin/halt /sbin/poweroff /sbin/reboot
 

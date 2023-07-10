@@ -6,7 +6,7 @@ KK_CURRENT_FOLDER=`dirname -- "$( readlink -f -- "$0"; )"`
 kk_cluster(){
    case "$1" in
     get) echo $(kind get clusters | tr "\n" " ");;
-    delete) kind delete cluster -n $2;;
+    delete) kind delete cluster -n $3;;
   esac
 }
 
@@ -40,6 +40,13 @@ case "$1" in
   ns|namespace) $KK_CURRENT_FOLDER/../modules/kubernetes/namespace $2 ;;
   ct|context) $KK_CURRENT_FOLDER/../modules/kubernetes/context $2 ;;
   completion) cat $KK_CURRENT_FOLDER/../modules/complete ;;
+  get|delete)
+    case "$2" in
+      cluster|clusters) kk_cluster $@;;
+      *) kubectl $@ ;; 
+    esac
+  ;;
+    
   ""|help) help;;
   *) kubectl $@ ;; 
 esac

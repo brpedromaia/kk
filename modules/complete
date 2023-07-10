@@ -1,15 +1,16 @@
 _kk_completions_validation(){
-  export KK_RESOURCE_LIST="$(kubectl api-resources --verbs="${COMP_WORDS[1]}" --no-headers --namespaced="true" 2>/dev/null| rev | awk '{print $5" "$4" "tolower($1)}'|rev| tr '\n' ' '| sed -r  's/[[:space:]]+/ /g') node nodes" 
-
+  export KK_RESOURCE_LIST="$(kubectl api-resources --verbs="${COMP_WORDS[1]}" --no-headers --namespaced="true" 2>/dev/null| rev | awk '{print $5" "$4" "tolower($1)}'|rev| tr '\n' ' '| sed -r  's/[[:space:]]+/ /g') node nodes cluster" 
+   
   case "$1" in
     verblist) echo "bootstrap namespace context create delete get list patch update watch";;
     ns|namespace) echo "$(kk $@)" ;;
     ct|context) echo "$(kk $@)" ;;
-    bootstrap) echo "cluster namespace" ;;
+    bootstrap) [ "${#@}" == "1" ] && echo "cluster namespace" ;;
     *)  if [ "${#@}" == "1" ];then
           echo $KK_RESOURCE_LIST
         elif [ "${KK_RESOURCE_LIST#*"$2"}" != "$KK_RESOURCE_LIST" ]; then
-          echo $(kk "$1 $2" | awk 'NR>1 {print $1}')
+          KK_OUTPUT=$(kk "get $2" 2>/dev/null | awk 'NR>1 {print $1}')
+          [ "$KK_OUTPUT" != "" ] && echo $KK_OUTPUT
         else
           echo ""
         fi   
@@ -27,7 +28,7 @@ __start_kk(){
   case "$(( ${#COMP_WORDS[@]} -2 ))" in
     0) _kk_completions_reply "$(_kk_completions_validation verblist)";;
     1) _kk_completions_reply "$(_kk_completions_validation ${COMP_WORDS[1]})";;
-    2) _kk_completions_reply "$(_kk_completions_validation "get" "${COMP_WORDS[2]}")";;
+    2) _kk_completions_reply "$(_kk_completions_validation "${COMP_WORDS[1]}" "${COMP_WORDS[2]}")";;
     *) _kk_completions_reply "" ;; 
   esac
 }

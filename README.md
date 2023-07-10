@@ -18,6 +18,14 @@ There are two ways to use that:
 1. Command line
 2. Automated Feature from yaml file
 
+## Framework tools version:
+
+| Tool | Version |
+| :---: | :---: |
+| kubectl | 1.27.3 |
+| kind | 0.20.0 |
+| argocd-cli | 2.7.7 |
+
 # Creating K8s Cluster with command line:
 
 ## Starting kk-framework container
@@ -290,9 +298,8 @@ result:
 </details>
 
 # TODO:
-- [ ] autocomplete bugs
-- [ ] command line [cluster]
-- [ ] manual cd withou argocd
+- [ ] better docs
+- [ ] automated bootstrap by custom plan.yml
+- [ ] manual cd without argocd
 - [ ] m1 build
 - [ ] tests with linux & mac
-- [ ] tools version doc
